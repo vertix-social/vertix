@@ -1,0 +1,20 @@
+version: 1
+collections:
+  - name: User
+  - name: ForeignAccount
+  - name: Note
+  - name: Follow
+    is_edge_collection: true
+  - name: Publish
+    is_edge_collection: true
+  - name: Share
+    is_edge_collection: true
+  - name: Like
+    is_edge_collection: true
+indexes:
+  - name: note_id
+    collection: Note
+    fields: ["id"]
+  - name: foreign_account_id
+    collection: ForeignAccount
+    fields: ["id"]

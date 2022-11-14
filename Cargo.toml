@@ -2,6 +2,5 @@
 
 members = [
   "vertix-model",
-  "vertix-db",
   "vertix-api"
 ]
