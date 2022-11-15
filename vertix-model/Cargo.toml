@@ -8,8 +8,12 @@ edition = "2021"
 [dependencies]
 serde = "1.0"
 serde_yaml = "0.9"
-anyhow = "1.0"
+thiserror = "1.0"
 
 [dependencies.aragog]
 #version = "0.17"
 git = "https://gitlab.com/qonfucius/aragog"
+
+[dev-dependencies]
+actix-rt = { version = "2.7.0" }
+anyhow = "1.0"

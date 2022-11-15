@@ -1,0 +1,48 @@
+# 
+# This schema file is auto generated and synchronized with the database.
+# Editing it will have no effect.
+# 
+---
+version: 1668470641496
+collections:
+  - name: Account
+    is_edge_collection: false
+  - name: Follow
+    is_edge_collection: true
+  - name: Publish
+    is_edge_collection: true
+  - name: Share
+    is_edge_collection: true
+  - name: Like
+    is_edge_collection: true
+  - name: Note
+    is_edge_collection: false
+indexes:
+  - name: Account_username_domain
+    collection: Account
+    fields:
+      - username
+      - domain
+    settings:
+      type: persistent
+      unique: false
+      sparse: false
+      deduplicate: false
+  - name: Account_uri
+    collection: Account
+    fields:
+      - uri
+    settings:
+      type: persistent
+      unique: false
+      sparse: false
+      deduplicate: false
+  - name: Note_uri
+    collection: Note
+    fields:
+      - uri
+    settings:
+      type: persistent
+      unique: false
+      sparse: false
+      deduplicate: false

@@ -1,8 +1,12 @@
 version: 1
 collections:
   - name: User
+    is_edge_collection: false
   - name: ForeignAccount
+    is_edge_collection: false
   - name: Note
+    is_edge_collection: false
+
   - name: Follow
     is_edge_collection: true
   - name: Publish
@@ -15,6 +19,9 @@ indexes:
   - name: note_id
     collection: Note
     fields: ["id"]
+    settings: {}
+
   - name: foreign_account_id
     collection: ForeignAccount
     fields: ["id"]
+    settings: {}
