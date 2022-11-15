@@ -13,4 +13,10 @@ impl Error {
             _ => false
         }
     }
+    
+    pub fn http_code(&self) -> u16 {
+        match self {
+            Error::Aragog(err) => err.http_code(),
+        }
+    }
 }
