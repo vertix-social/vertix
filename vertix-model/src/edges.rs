@@ -1,14 +1,20 @@
 use serde::{Serialize, Deserialize};
 use aragog::{Record, EdgeRecord, DatabaseRecord, DatabaseAccess, compare};
+use chrono::{DateTime, Utc};
 use crate::{Account, Error};
 
-#[derive(Debug, Clone, Serialize, Deserialize, Record, Default)]
-#[serde(default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Record)]
 pub struct Follow {
+    #[serde(default)]
     pub accepted: Option<bool>,
+    pub created_at: DateTime<Utc>,
 }
 
 impl Follow {
+    pub fn new() -> Follow {
+        Follow { accepted: None, created_at: Utc::now() }
+    }
+
     /// Initiate follow request between two accounts.
     pub async fn link<D>(
         actor: &DatabaseRecord<Account>,
@@ -22,7 +28,7 @@ impl Follow {
             actor,
             target,
             db,
-            Follow::default()
+            Follow::new()
         ).await?)
     }
 
@@ -47,17 +53,35 @@ impl Follow {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Record, Default)]
-#[serde(default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Record)]
 pub struct Publish {
+    pub created_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Record, Default)]
-#[serde(default)]
+impl Publish {
+    pub fn new() -> Publish {
+        Publish { created_at: Utc::now() }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Record)]
 pub struct Share {
+    pub created_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Record, Default)]
-#[serde(default)]
+impl Share {
+    pub fn new() -> Share {
+        Share { created_at: Utc::now() }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Record)]
 pub struct Like {
+    pub created_at: DateTime<Utc>,
+}
+
+impl Like {
+    pub fn new() -> Like {
+        Like { created_at: Utc::now() }
+    }
 }

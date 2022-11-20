@@ -6,17 +6,45 @@
 up:
   - create_edge_collection:
       name: Follow
+      wait_for_sync: false
   - create_edge_collection:
       name: Publish
+      wait_for_sync: false
+  - create_index:
+      name: Publish_from_created_at
+      fields: ["_from", "created_at"]
+      collection: Publish
+      settings:
+        type: persistent
+        unique: false
+        sparse: false
+        deduplicate: false
   - create_edge_collection:
       name: Share
+      wait_for_sync: false
+  - create_index:
+      name: Share_from_created_at
+      fields: ["_from", "created_at"]
+      collection: Share
+      settings:
+        type: persistent
+        unique: false
+        sparse: false
+        deduplicate: false
   - create_edge_collection:
       name: Like
+      wait_for_sync: false
 down:
   - delete_edge_collection:
       name: Follow
+  - delete_index:
+      name: Publish_from_created_at
+      collection: Publish
   - delete_edge_collection:
       name: Publish
+  - delete_index:
+      name: Share_from_created_at
+      collection: Share
   - delete_edge_collection:
       name: Share
   - delete_edge_collection:

@@ -1,9 +1,11 @@
 use serde::{Serialize, Deserialize};
 use aragog::{Record, DatabaseAccess, DatabaseRecord};
+use chrono::{DateTime, Utc};
 
 use crate::{Error, Account, Publish};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Record)]
+#[before_save(func = "before_save")]
 pub struct Note {
     #[serde(default)]
     pub uri: Option<String>,
@@ -21,6 +23,9 @@ pub struct Note {
     pub bcc: Vec<String>,
 
     pub content: String,
+
+    pub created_at: DateTime<Utc>,
+    pub updated_at: Option<DateTime<Utc>>,
 }
 
 impl Note {
@@ -32,7 +37,9 @@ impl Note {
             cc: vec![],
             bto: vec![],
             bcc: vec![],
-            content
+            content,
+            created_at: Utc::now(),
+            updated_at: None,
         }
     }
 
@@ -47,8 +54,13 @@ impl Note {
     {
         let note = Note::create(note, db).await?;
 
-        DatabaseRecord::link(publisher, &note, db, Publish { }).await?;
+        DatabaseRecord::link(publisher, &note, db, Publish::new()).await?;
 
         Ok(note)
+    }
+
+    fn before_save(&mut self) -> Result<(), aragog::Error> {
+        self.updated_at = Some(Utc::now());
+        Ok(())
     }
 }

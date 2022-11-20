@@ -6,6 +6,7 @@
 up:
   - create_collection:
       name: Note
+      wait_for_sync: false
   - create_index:
       name: Note_uri
       fields: ["uri"]
@@ -16,5 +17,8 @@ up:
         sparse: false
         deduplicate: false
 down:
+  - delete_index:
+      name: Note_uri
+      collection: Note
   - delete_collection:
       name: Note

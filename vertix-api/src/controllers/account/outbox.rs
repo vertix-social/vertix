@@ -1,6 +1,6 @@
 use activitystreams::{collection::{OrderedCollection, OrderedCollectionPage}, object};
 use actix_web::{web, get, Responder};
-use vertix_model::Account;
+use vertix_model::{Account, PageLimit};
 
 use crate::{ApiState, Error};
 
@@ -30,10 +30,11 @@ pub async fn get_account_outbox(
 
 #[get("/users/{username}/outbox/page/{page}")]
 pub async fn get_account_outbox_page(
-    params: web::Path<(String, u64)>,
+    params: web::Path<(String, u32)>,
     state: web::Data<ApiState>
 ) -> Result<impl Responder, Error> {
     let (username, page) = params.into_inner();
+    let page_limit = PageLimit { page, ..PageLimit::default() };
 
     let db = state.pool.get().await?;
 
@@ -41,7 +42,7 @@ pub async fn get_account_outbox_page(
 
     let mut page = OrderedCollectionPage::new();
 
-    let notes = Account::get_published_notes(&account, &*db).await?;
+    let notes = Account::get_published_notes(&account, page_limit, &*db).await?;
 
     let items = notes.iter().map(|note| {
         let mut as_note = object::Note::full();

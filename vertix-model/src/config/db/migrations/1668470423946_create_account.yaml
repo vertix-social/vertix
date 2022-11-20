@@ -6,6 +6,7 @@
 up:
   - create_collection:
       name: Account
+      wait_for_sync: false
   - create_index:
       name: Account_username_domain
       fields: ["username", "domain"]
@@ -25,5 +26,11 @@ up:
         sparse: false
         deduplicate: false
 down:
+  - delete_index:
+      name: Account_uri
+      collection: Account
+  - delete_index:
+      name: Account_username_domain
+      collection: Account
   - delete_collection:
       name: Account

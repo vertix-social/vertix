@@ -1,8 +1,12 @@
-use crate::{Error, Note, Publish, Follow};
-use aragog::{compare, DatabaseAccess, DatabaseRecord, Record, query::{QueryResult, Query}};
+use crate::{Error, Note, PageLimit, ApplyPageLimit};
+use aragog::{compare, DatabaseAccess, DatabaseRecord, Record, query::{QueryResult, Query, SortDirection}};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use serde_json::json;
+use maplit::hashmap;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Record)]
+#[before_save(func = "before_save")]
 pub struct Account {
     /// The username part of the handle, i.e. the username in a handle `@{username}` or
     /// `@{username}@{domain}`
@@ -15,6 +19,9 @@ pub struct Account {
     /// The uri at which the user's data can be found. None if local.
     #[serde(default)]
     pub uri: Option<String>,
+    
+    pub created_at: DateTime<Utc>,
+    pub updated_at: Option<DateTime<Utc>>,
 }
 
 impl Account {
@@ -24,6 +31,8 @@ impl Account {
             username,
             domain: None,
             uri: None,
+            created_at: Utc::now(),
+            updated_at: None,
         }
     }
 
@@ -71,16 +80,16 @@ impl Account {
     /// Get the notes that this account has published.
     pub async fn get_published_notes<D>(
         record: &DatabaseRecord<Account>,
+        page_limit: PageLimit,
         db: &D
     ) -> Result<QueryResult<Note>, Error>
     where
         D: DatabaseAccess,
     {
         Ok(Note::get(
-            &Account::query()
-                .bind_var("account_key", record.key().as_str())
-                .filter(compare!(field "_key").equals("@account_key").into())
-                .join_outbound(1, 1, false, Publish::query())
+            &Query::outbound(1, 1, "Publish", record.id().as_str())
+                .apply_page_limit(page_limit)
+                .sort("created_at", Some(SortDirection::Desc))
                 .with_collections(&["Account", "Publish", "Note"]),
             db
         ).await?)
@@ -89,16 +98,15 @@ impl Account {
     /// Get the list of accounts that this account is following.
     pub async fn get_following<D>(
         record: &DatabaseRecord<Account>,
+        page_limit: PageLimit,
         db: &D
     ) -> Result<QueryResult<Account>, Error>
     where
         D: DatabaseAccess,
     {
         Ok(Account::get(
-            &Account::query()
-                .bind_var("account_key", record.key().as_str())
-                .filter(compare!(field "_key").equals("@account_key").into())
-                .join_outbound(1, 1, false, Follow::query())
+            &Query::outbound(1, 1, "Follow", record.id().as_str())
+                .apply_page_limit(page_limit)
                 .with_collections(&["Account", "Follow"]),
             db
         ).await?)
@@ -107,16 +115,15 @@ impl Account {
     /// Get the list of accounts that are following this account.
     pub async fn get_followers<D>(
         record: &DatabaseRecord<Account>,
+        page_limit: PageLimit,
         db: &D
     ) -> Result<QueryResult<Account>, Error>
     where
         D: DatabaseAccess,
     {
         Ok(Account::get(
-            &Account::query()
-                .bind_var("account_key", record.key().as_str())
-                .filter(compare!(field "_key").equals("@account_key").into())
-                .join_inbound(1, 1, false, Follow::query())
+            &Query::inbound(1, 1, "Follow", record.id().as_str())
+                .apply_page_limit(page_limit)
                 .with_collections(&["Account", "Follow"]),
             db
         ).await?)
@@ -125,18 +132,33 @@ impl Account {
     /// Get the latest posts that this account's followers have published or announced.
     pub async fn get_timeline<D>(
         record: &DatabaseRecord<Account>,
+        page_limit: PageLimit,
         db: &D
     ) -> Result<QueryResult<Note>, Error> 
     where
         D: DatabaseAccess,
     {
-        Ok(Note::get(
-            &Account::query()
-                .bind_var("account_key", record.key().as_str())
-                .filter(compare!(field "_key").equals("@account_key").into())
-                .join_outbound(2, 2, false, Query::new("Follow, Publish, Share"))
-                .with_collections(&["Account", "Follow", "Publish", "Share", "Note"]),
-            db
-        ).await?)
+        // Really impossible to do this efficiently without a raw query
+        let res: Vec<DatabaseRecord<Note>> = db.database()
+            .aql_bind_vars(r#"
+                WITH Account, Follow, Publish, Share, Note
+                FOR account IN Account
+                    FILTER account._key == @account_key
+                    FOR note, edge, path IN 2..2 OUTBOUND account Follow, Publish, Share
+                        SORT path.edges[1].created_at DESC
+                        LIMIT @offset, @limit
+                        RETURN note
+            "#, hashmap! {
+                "account_key" => json!(record.key().as_str()),
+                "offset" => json!(page_limit.offset()),
+                "limit" => json!(page_limit.limit)
+            })
+            .await.map_err(aragog::Error::from)?;
+        Ok(QueryResult(res))
+    }
+
+    fn before_save(&mut self) -> Result<(), aragog::Error> {
+        self.updated_at = Some(Utc::now());
+        Ok(())
     }
 }

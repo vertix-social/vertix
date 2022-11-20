@@ -2,8 +2,9 @@ use vertix_model::*;
 use actix_rt;
 use anyhow::Result;
 use aragog::Record;
+use test_log::test;
 
-#[actix_rt::test]
+#[test(actix_rt::test)]
 async fn follow_publish_and_view_timeline() -> Result<()> {
     let conn = create_connection().await?;
 
@@ -17,10 +18,18 @@ async fn follow_publish_and_view_timeline() -> Result<()> {
 
     let note = Note::publish(&account2, Note::new("Hello, world!".into()), &conn).await?;
 
-    let timeline = Account::get_timeline(&account1, &conn).await?;
+    let timeline = Account::get_timeline(&account1, PageLimit::default(), &conn).await?;
 
     assert_eq!(timeline.len(), 1);
     assert!(timeline.iter().any(|t_note| t_note.key() == note.key()));
+
+    let note2 = Note::publish(&account2, Note::new("This is my second post.".into()), &conn).await?;
+
+    let timeline = Account::get_timeline(&account1, PageLimit::default(), &conn).await?;
+
+    assert_eq!(timeline.len(), 2);
+    assert_eq!(timeline[0].id(), note2.id());
+    assert_eq!(timeline[1].id(), note.id());
 
     Ok(())
 }
