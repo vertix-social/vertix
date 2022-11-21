@@ -1,0 +1,15 @@
+[package]
+name = "vertix-worker"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+vertix-comm = { path = "../vertix-comm" }
+actix-rt = "2.7.0"
+log = "0.4"
+env_logger = "0.9"
+anyhow = "1.0"
+lapin = "2.1.1"
+futures = "0.3"

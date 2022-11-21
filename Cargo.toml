@@ -1,6 +1,9 @@
 [workspace]
 
+resolver = "2"
 members = [
   "vertix-model",
-  "vertix-api"
+  "vertix-comm",
+  "vertix-api",
+  "vertix-worker"
 ]
