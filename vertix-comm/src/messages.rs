@@ -1,24 +1,20 @@
-use lapin::{Channel, ExchangeKind};
-use serde::{Serialize, Deserialize};
-use super::SingleExchangeMessage;
+use lapin::{Channel};
 use crate::error::Result;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TestAnnounce {
-    pub message: String,
-}
+mod test_announce;
+mod transaction;
+mod interaction;
 
-impl SingleExchangeMessage for TestAnnounce {
-    fn exchange() -> &'static str { "TestAnnounce" }
-
-    fn routing_key(&self) -> std::borrow::Cow<'_, str> {
-        "".into()
-    }
-}
+pub use test_announce::*;
+pub use transaction::*;
+pub use interaction::*;
 
 pub async fn setup(ch: &Channel) -> Result<()> {
-    ch.exchange_declare("TestAnnounce", ExchangeKind::Fanout, Default::default(),
-        Default::default()).await?;
+    futures::try_join!(
+        TestAnnounce::setup(ch),
+        Transaction::setup(ch),
+        Interaction::setup(ch),
+    )?;
 
     Ok(())
 }

@@ -4,27 +4,38 @@ use chrono::{DateTime, Utc};
 
 use crate::{Error, Account, Publish};
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Recipient {
+    Public,
+    Account(String),
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Record)]
+#[before_create(func = "before_create")]
 #[before_save(func = "before_save")]
 pub struct Note {
     #[serde(default)]
     pub uri: Option<String>,
 
     #[serde(default)]
-    pub to: Vec<String>,
+    pub to: Vec<Recipient>,
 
     #[serde(default)]
-    pub cc: Vec<String>,
+    pub cc: Vec<Recipient>,
 
     #[serde(default)]
-    pub bto: Vec<String>,
+    pub bto: Vec<Recipient>,
 
     #[serde(default)]
-    pub bcc: Vec<String>,
+    pub bcc: Vec<Recipient>,
 
     pub content: String,
 
-    pub created_at: DateTime<Utc>,
+    #[serde(default)]
+    pub created_at: Option<DateTime<Utc>>,
+
+    #[serde(default)]
     pub updated_at: Option<DateTime<Utc>>,
 }
 
@@ -38,7 +49,7 @@ impl Note {
             bto: vec![],
             bcc: vec![],
             content,
-            created_at: Utc::now(),
+            created_at: None,
             updated_at: None,
         }
     }
@@ -54,9 +65,14 @@ impl Note {
     {
         let note = Note::create(note, db).await?;
 
-        DatabaseRecord::link(publisher, &note, db, Publish::new()).await?;
+        DatabaseRecord::link(publisher, &note, db, Publish::default()).await?;
 
         Ok(note)
+    }
+
+    fn before_create(&mut self) -> Result<(), aragog::Error> {
+        self.created_at = Some(Utc::now());
+        Ok(())
     }
 
     fn before_save(&mut self) -> Result<(), aragog::Error> {

@@ -2,7 +2,7 @@ use activitystreams::{collection::{OrderedCollection, OrderedCollectionPage}, ob
 use actix_web::{web, get, Responder};
 use vertix_model::{Account, PageLimit};
 
-use crate::{ApiState, Error};
+use crate::{ApiState, error::Result};
 
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(get_account_outbox);
@@ -13,7 +13,7 @@ pub fn config(cfg: &mut web::ServiceConfig) {
 pub async fn get_account_outbox(
     username: web::Path<String>,
     state: web::Data<ApiState>
-) -> Result<impl Responder, Error> {
+) -> Result<impl Responder> {
     let db = state.pool.get().await?;
 
     let _ = Account::find_by_username(&*username, None, &*db).await?;
@@ -32,7 +32,7 @@ pub async fn get_account_outbox(
 pub async fn get_account_outbox_page(
     params: web::Path<(String, u32)>,
     state: web::Data<ApiState>
-) -> Result<impl Responder, Error> {
+) -> Result<impl Responder> {
     let (username, page) = params.into_inner();
     let page_limit = PageLimit { page, ..PageLimit::default() };
 
@@ -48,7 +48,7 @@ pub async fn get_account_outbox_page(
         let mut as_note = object::Note::full();
         as_note.base.object_props.set_content_xsd_string(note.content.clone())?;
         Ok(as_note)
-    }).collect::<Result<Vec<_>, Error>>()?;
+    }).collect::<Result<Vec<_>>>()?;
 
     let domain = &state.domain;
 

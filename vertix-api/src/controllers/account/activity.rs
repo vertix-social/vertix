@@ -1,6 +1,6 @@
 use activitystreams::actor::Person;
 use actix_web::{web, get, Responder};
-use crate::{ApiState, Error};
+use crate::{ApiState, error::Result};
 use vertix_model::Account;
 
 pub fn config(cfg: &mut web::ServiceConfig) {
@@ -11,7 +11,7 @@ pub fn config(cfg: &mut web::ServiceConfig) {
 pub async fn get_activity_stream(
     username: web::Path<String>,
     state: web::Data<ApiState>
-) -> Result<impl Responder, Error> {
+) -> Result<impl Responder> {
     let db = state.pool.get().await?;
 
     let account = Account::find_by_username(&*username, None, &*db).await?;

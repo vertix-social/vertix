@@ -1,10 +1,12 @@
 use anyhow::Result;
-use lapin::Channel;
-use log::{info, warn};
-use futures::stream::StreamExt;
+use log::info;
 
 use vertix_comm::*;
-use vertix_comm::messages::TestAnnounce;
+use vertix_model::AragogConnectionManager;
+
+mod log_test_announce;
+mod process_transaction;
+mod log_interaction;
 
 #[actix_rt::main]
 async fn main() -> Result<()> {
@@ -22,35 +24,23 @@ async fn main() -> Result<()> {
         messages::setup(&init_channel).await?;
     }
 
+    let pool = bb8::Pool::builder().build(AragogConnectionManager).await?;
+
     macro_rules! start {
-        ($function:ident) => ({
+        ($function:expr, $($arg:expr),*) => ({
             let channel = conn.create_channel().await?;
-            actix_rt::spawn(async move { $function(&channel).await });
-        })
+            actix_rt::spawn(async move { $function(&channel, $($arg),*).await });
+        });
+        ($function:expr) => (start!($function,));
     }
 
-    start!(log_test_announce);
+    start!(log_test_announce::listen);
+    start!(process_transaction::listen, pool.clone());
+    start!(log_interaction::listen);
 
     info!("ready.");
 
     actix_rt::signal::ctrl_c().await?;
-
-    Ok(())
-}
-
-async fn log_test_announce(channel: &Channel) -> Result<()> {
-    let mut stream = TestAnnounce::receive_copies(channel, "").await?;
-
-    while let Some(result) = stream.next().await {
-        match result {
-            Ok(msg) => {
-                info!("TestAnnounce: {}", msg.message);
-            },
-            Err(err) => {
-                warn!("error in TestAnnounce: {}", err);
-            }
-        }
-    }
 
     Ok(())
 }

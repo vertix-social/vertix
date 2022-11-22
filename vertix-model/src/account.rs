@@ -6,6 +6,7 @@ use serde_json::json;
 use maplit::hashmap;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Record)]
+#[before_create(func = "before_create")]
 #[before_save(func = "before_save")]
 pub struct Account {
     /// The username part of the handle, i.e. the username in a handle `@{username}` or
@@ -19,8 +20,11 @@ pub struct Account {
     /// The uri at which the user's data can be found. None if local.
     #[serde(default)]
     pub uri: Option<String>,
-    
-    pub created_at: DateTime<Utc>,
+
+    #[serde(default)]
+    pub created_at: Option<DateTime<Utc>>,
+
+    #[serde(default)]
     pub updated_at: Option<DateTime<Utc>>,
 }
 
@@ -31,7 +35,7 @@ impl Account {
             username,
             domain: None,
             uri: None,
-            created_at: Utc::now(),
+            created_at: None,
             updated_at: None,
         }
     }
@@ -155,6 +159,11 @@ impl Account {
             })
             .await.map_err(aragog::Error::from)?;
         Ok(QueryResult(res))
+    }
+
+    fn before_create(&mut self) -> Result<(), aragog::Error> {
+        self.created_at = Some(Utc::now());
+        Ok(())
     }
 
     fn before_save(&mut self) -> Result<(), aragog::Error> {

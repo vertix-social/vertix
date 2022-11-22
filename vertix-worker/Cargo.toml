@@ -7,9 +7,17 @@ edition = "2021"
 
 [dependencies]
 vertix-comm = { path = "../vertix-comm" }
+vertix-model = { path = "../vertix-model" }
+serde = "1.0"
+serde_json = "1.0"
 actix-rt = "2.7.0"
 log = "0.4"
 env_logger = "0.9"
 anyhow = "1.0"
 lapin = "2.1.1"
 futures = "0.3"
+bb8 = "0.8.0"
+
+[dependencies.aragog]
+#version = "0.17"
+git = "https://gitlab.com/qonfucius/aragog"

@@ -3,18 +3,24 @@ use aragog::{Record, EdgeRecord, DatabaseRecord, DatabaseAccess, compare};
 use chrono::{DateTime, Utc};
 use crate::{Account, Error};
 
-#[derive(Debug, Clone, Serialize, Deserialize, Record)]
+macro_rules! created_at_hook {
+    () => {
+        fn before_create(&mut self) -> Result<(), aragog::Error> {
+            self.created_at = Some(Utc::now());
+            Ok(())
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, Record)]
+#[before_create(func = "before_create")]
+#[serde(default)]
 pub struct Follow {
-    #[serde(default)]
     pub accepted: Option<bool>,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Option<DateTime<Utc>>,
 }
 
 impl Follow {
-    pub fn new() -> Follow {
-        Follow { accepted: None, created_at: Utc::now() }
-    }
-
     /// Initiate follow request between two accounts.
     pub async fn link<D>(
         actor: &DatabaseRecord<Account>,
@@ -28,7 +34,7 @@ impl Follow {
             actor,
             target,
             db,
-            Follow::new()
+            Follow::default()
         ).await?)
     }
 
@@ -51,37 +57,39 @@ impl Follow {
             db
         ).await?.first_record().unwrap())
     }
+
+    created_at_hook!();
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Record)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, Record)]
+#[before_create(func = "before_create")]
+#[serde(default)]
 pub struct Publish {
-    pub created_at: DateTime<Utc>,
+    pub created_at: Option<DateTime<Utc>>,
 }
 
 impl Publish {
-    pub fn new() -> Publish {
-        Publish { created_at: Utc::now() }
-    }
+    created_at_hook!();
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Record)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, Record)]
+#[before_create(func = "before_create")]
+#[serde(default)]
 pub struct Share {
-    pub created_at: DateTime<Utc>,
+    pub created_at: Option<DateTime<Utc>>,
 }
 
 impl Share {
-    pub fn new() -> Share {
-        Share { created_at: Utc::now() }
-    }
+    created_at_hook!();
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Record)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, Record)]
+#[before_create(func = "before_create")]
+#[serde(default)]
 pub struct Like {
-    pub created_at: DateTime<Utc>,
+    pub created_at: Option<DateTime<Utc>>,
 }
 
 impl Like {
-    pub fn new() -> Like {
-        Like { created_at: Utc::now() }
-    }
+    created_at_hook!();
 }

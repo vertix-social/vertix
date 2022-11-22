@@ -24,7 +24,7 @@ pub trait SendMessage {
 
 #[async_trait(?Send)]
 pub trait ReceiveMessage: Sized {
-    async fn receive(channel: &Channel, queue_name: &str)
+    async fn receive(channel: &Channel, queue_name: &str, options: BasicConsumeOptions)
         -> Result<Pin<Box<dyn Stream<Item=Result<Delivery<Self>>>>>>;
 
     async fn receive_copies(channel: &Channel, routing_key: &str)
@@ -33,7 +33,14 @@ pub trait ReceiveMessage: Sized {
 
 pub trait SingleExchangeMessage: Sized {
     fn exchange() -> &'static str;
-    fn routing_key(&self) -> Cow<'_, str>;
+
+    fn routing_key(&self) -> Cow<'_, str> {
+        "".into()
+    }
+
+    fn amqp_properties(&self) -> AMQPProperties {
+        AMQPProperties::default()
+    }
 }
 
 #[async_trait(?Send)]
@@ -45,19 +52,16 @@ impl<M> SendMessage for M where M: SingleExchangeMessage + Serialize {
             &*self.routing_key(),
             Default::default(),
             &serialized[..],
-            AMQPProperties::default()
+            self.amqp_properties()
         ).await?)
     }
 }
 
 #[async_trait(?Send)]
 impl<M> ReceiveMessage for M where M: SingleExchangeMessage + DeserializeOwned + 'static {
-    async fn receive(channel: &Channel, queue_name: &str)
+    async fn receive(channel: &Channel, queue_name: &str, options: BasicConsumeOptions)
         -> Result<Pin<Box<dyn Stream<Item=Result<Delivery<Self>>>>>> {
-        let stream = channel.basic_consume(queue_name, "", BasicConsumeOptions {
-            no_ack: true,
-            ..Default::default()
-        }, Default::default()).await?;
+        let stream = channel.basic_consume(queue_name, "", options, Default::default()).await?;
 
         Ok(Box::pin(stream.map_err(Error::from).and_then(|item| async move {
             let deserialized = serde_json::from_slice(&item.data[..])?;
@@ -76,7 +80,10 @@ impl<M> ReceiveMessage for M where M: SingleExchangeMessage + DeserializeOwned +
         channel.queue_bind(queue.name().as_str(), Self::exchange(), routing_key, Default::default(),
             Default::default()).await?;
 
-        let stream = Self::receive(channel, queue.name().as_str()).await?;
+        let stream = Self::receive(channel, queue.name().as_str(), BasicConsumeOptions {
+            no_ack: true, // make sure acker is unnecessary
+            ..Default::default()
+        }).await?;
 
         Ok(Box::pin(stream.map_ok(|item| item.data)))
     }

@@ -18,6 +18,7 @@ pub use error::Error;
 pub struct ApiState {
     domain: String,
     pool: bb8::Pool<AragogConnectionManager>,
+    broker: lapin::Connection,
 }
 
 #[get("/")]
@@ -92,8 +93,10 @@ async fn main() -> Result<()> {
     {
         let _ = vertix_model::create_connection().await?;
     }
-    
-    let state = ApiState { domain, pool };
+
+    let broker = vertix_comm::create_connection().await?;
+
+    let state = ApiState { domain, pool, broker };
 
     serve(&host, port, state).await?;
 

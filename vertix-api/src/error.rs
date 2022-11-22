@@ -1,6 +1,5 @@
 use core::convert::Infallible;
 
-use vertix_model::Error as ModelError;
 use actix_web::{error::ResponseError, http::StatusCode};
 use activitystreams::primitives::{
     XsdFloatError,
@@ -15,10 +14,13 @@ use activitystreams::primitives::{
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("{0}")]
-    Model(#[from] ModelError),
+    Model(#[from] vertix_model::Error),
+
+    #[error("{0}")]
+    Comm(#[from] vertix_comm::Error),
 
     #[error("pool error: {0}")]
-    Pool(#[from] bb8::RunError<ModelError>),
+    Pool(#[from] bb8::RunError<vertix_model::Error>),
 
     #[error("activity streams validation error: {0}")]
     ActivityStreams(ActivityStreamsError),
@@ -33,16 +35,24 @@ impl ResponseError for Error {
             Error::Model(ref err) => StatusCode::from_u16(err.http_code())
                 .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR),
 
-            Error::Pool(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            Error::ActivityStreams(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            Error::Io(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            Error::Pool(_) |
+            Error::Comm(_) |
+            Error::ActivityStreams(_) |
+            Error::Io(_) =>
+                StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 }
 
 impl From<aragog::Error> for Error {
     fn from(err: aragog::Error) -> Self {
-        ModelError::from(err).into()
+        vertix_model::Error::from(err).into()
+    }
+}
+
+impl From<lapin::Error> for Error {
+    fn from(err: lapin::Error) -> Self {
+        vertix_comm::Error::from(err).into()
     }
 }
 
@@ -75,3 +85,5 @@ pub enum ActivityStreamsError{
     #[error("{0}")]
     XsdNonNegativeIntegerError(#[from] XsdNonNegativeIntegerError),
 }
+
+pub type Result<T> = std::result::Result<T, Error>;
