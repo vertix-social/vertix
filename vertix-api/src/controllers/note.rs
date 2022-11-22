@@ -1,4 +1,5 @@
-use actix_web::{web, post, Responder};
+use actix_web::{web, get, post, Responder};
+use aragog::Record;
 use vertix_model::{Note, Account};
 use vertix_comm::messages::{Transaction, Action, ActionResponse};
 use vertix_comm::RpcMessage;
@@ -8,11 +9,24 @@ use crate::Error;
 use crate::{error::Result, ApiState};
 
 pub fn config(cfg: &mut web::ServiceConfig) {
+    cfg.service(get_note);
     cfg.service(publish_note);
 }
 
+#[get("/api/v1/notes/{key}")]
+pub async fn get_note(
+    state: web::Data<ApiState>,
+    path: web::Path<String>
+) -> Result<impl Responder> {
+    let db = state.pool.get().await?;
+
+    let note = Note::find(&*path, &*db).await?;
+
+    Ok(web::Json(note))
+}
+
 // FIXME auth
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct PublishNoteQuery {
     pub from_username: String,
 }
