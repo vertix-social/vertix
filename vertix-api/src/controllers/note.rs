@@ -1,9 +1,10 @@
 use actix_web::{web, post, Responder};
 use vertix_model::{Note, Account};
-use vertix_comm::messages::{Transaction, Action};
-use vertix_comm::SendMessage;
+use vertix_comm::messages::{Transaction, Action, ActionResponse};
+use vertix_comm::RpcMessage;
 use serde::Deserialize;
 
+use crate::Error;
 use crate::{error::Result, ApiState};
 
 pub fn config(cfg: &mut web::ServiceConfig) {
@@ -34,8 +35,10 @@ pub async fn publish_note(
         }
     ] };
 
-    transaction.send(&ch).await?.await?;
+    let response = transaction.remote_call(&ch).await?;
 
-    // TODO: find some way to get the result of the transaction.
-    Ok("")
+    match &*response.responses {
+        [ActionResponse::PublishNote(note)] => Ok(web::Json(note.clone())),
+        _ => Err(Error::InternalError("bad reply from worker".into()))
+    }
 }

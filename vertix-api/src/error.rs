@@ -1,4 +1,5 @@
 use core::convert::Infallible;
+use std::borrow::Cow;
 
 use actix_web::{error::ResponseError, http::StatusCode};
 use activitystreams::primitives::{
@@ -27,6 +28,9 @@ pub enum Error {
 
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),
+
+    #[error("internal error: {0}")]
+    InternalError(Cow<'static, str>),
 }
 
 impl ResponseError for Error {
@@ -38,7 +42,8 @@ impl ResponseError for Error {
             Error::Pool(_) |
             Error::Comm(_) |
             Error::ActivityStreams(_) |
-            Error::Io(_) =>
+            Error::Io(_) |
+            Error::InternalError(_) =>
                 StatusCode::INTERNAL_SERVER_ERROR,
         }
     }

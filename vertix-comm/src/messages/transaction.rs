@@ -1,8 +1,9 @@
+use aragog::DatabaseRecord;
 use lapin::{Channel, ExchangeKind, options::{ExchangeDeclareOptions, QueueDeclareOptions}};
 use serde::{Serialize, Deserialize};
 use vertix_model::Note;
 
-use crate::{error::Result, SingleExchangeMessage};
+use crate::{error::Result, SingleExchangeMessage, RpcMessage};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Transaction {
@@ -19,8 +20,23 @@ pub enum Action {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransactionResponse {
+    pub responses: Vec<ActionResponse>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", content = "body")]
+pub enum ActionResponse {
+    PublishNote(DatabaseRecord<Note>),
+}
+
 impl SingleExchangeMessage for Transaction {
     fn exchange() -> &'static str { "Transaction" }
+}
+
+impl RpcMessage for Transaction {
+    type Response = TransactionResponse;
 }
 
 impl Transaction {

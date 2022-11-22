@@ -8,6 +8,9 @@ pub enum Error {
 
     #[error("env var not set: AMQP_ADDR")]
     AmqpConfigMissing,
+
+    #[error("no reply to rpc call")]
+    NoReply,
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
