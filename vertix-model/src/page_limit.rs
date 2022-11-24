@@ -1,7 +1,7 @@
 use serde::{Serialize, Deserialize};
 use aragog::query::Query;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PageLimit {
     pub page: u32,
     pub limit: u32,

@@ -9,6 +9,7 @@ use log::{info, warn};
 
 use vertix_model::AragogConnectionManager;
 
+mod formats;
 mod controllers;
 mod error;
 

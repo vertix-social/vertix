@@ -1,7 +1,8 @@
 use activitystreams::actor::Person;
 use actix_web::{web, get, Responder};
-use crate::{ApiState, error::Result};
+use crate::{ApiState, error::Result, formats::ActivityJson};
 use vertix_model::Account;
+use chrono::{DateTime, FixedOffset};
 
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(get_activity_stream);
@@ -20,9 +21,23 @@ pub async fn get_activity_stream(
     
     let domain = &state.domain;
 
-    person.extension.set_preferred_username(account.username.clone())?;
-    person.extension.set_inbox(format!("http://{domain}/users/{username}/inbox"))?;
-    person.extension.set_outbox(format!("http://{domain}/users/{username}/outbox"))?;
+    {
+        let o = &mut person.base.base.object_props;
+        o.set_id(format!("http://{domain}/users/{username}"))?;
+        o.set_context_xsd_any_uri(activitystreams::context())?;
+        o.set_name_xsd_string(username.as_str())?;
 
-    Ok(web::Json(person))
+        if let Some(created_at) = account.created_at.clone() {
+            o.set_published(DateTime::<FixedOffset>::from(created_at))?;
+        }
+    }
+
+    {
+        let e = &mut person.extension;
+        e.set_preferred_username(account.username.clone())?;
+        e.set_inbox(format!("http://{domain}/users/{username}/inbox"))?;
+        e.set_outbox(format!("http://{domain}/users/{username}/outbox"))?;
+    }
+
+    Ok(ActivityJson(person))
 }
