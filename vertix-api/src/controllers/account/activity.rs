@@ -1,8 +1,8 @@
-use activitystreams::actor::Person;
+use std::sync::Arc;
+
 use actix_web::{web, get, Responder};
 use crate::{ApiState, error::Result, formats::ActivityJson};
-use vertix_model::Account;
-use chrono::{DateTime, FixedOffset};
+use vertix_model::{Account, activitystreams::ToObject};
 
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(get_activity_stream);
@@ -15,29 +15,11 @@ pub async fn get_activity_stream(
 ) -> Result<impl Responder> {
     let db = state.pool.get().await?;
 
-    let account = Account::find_by_username(&*username, None, &*db).await?;
+    let urls = state.urls(&*db);
 
-    let mut person = Person::full();
-    
-    let domain = &state.domain;
+    let account: Arc<_> = Account::find_by_username(&*username, None, &*db).await?.into();
 
-    {
-        let o = &mut person.base.base.object_props;
-        o.set_id(format!("http://{domain}/users/{username}"))?;
-        o.set_context_xsd_any_uri(activitystreams::context())?;
-        o.set_name_xsd_string(username.as_str())?;
-
-        if let Some(created_at) = account.created_at.clone() {
-            o.set_published(DateTime::<FixedOffset>::from(created_at))?;
-        }
-    }
-
-    {
-        let e = &mut person.extension;
-        e.set_preferred_username(account.username.clone())?;
-        e.set_inbox(format!("http://{domain}/users/{username}/inbox"))?;
-        e.set_outbox(format!("http://{domain}/users/{username}/outbox"))?;
-    }
+    let person = account.to_object::<_, crate::Error>(&urls).await?;
 
     Ok(ActivityJson(person))
 }

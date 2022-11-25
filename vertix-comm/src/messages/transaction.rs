@@ -13,11 +13,7 @@ pub struct Transaction {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", content = "params")]
 pub enum Action {
-    PublishNote {
-        from: String,
-        #[serde(flatten)]
-        note: Note
-    }
+    PublishNote(Note),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

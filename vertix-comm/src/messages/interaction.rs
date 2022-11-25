@@ -24,11 +24,7 @@ use crate::{SingleExchangeMessage, ReceiveMessage, error::Result};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", content = "params")]
 pub enum Interaction {
-    Note {
-        from: String,
-        #[serde(flatten)]
-        note: DatabaseRecord<Note>,
-    }
+    Note(DatabaseRecord<Note>),
 }
 
 impl SingleExchangeMessage for Interaction {
@@ -41,13 +37,15 @@ impl SingleExchangeMessage for Interaction {
 
         // v-from
         match self {
-            Interaction::Note { from, .. } =>
-                headers.insert(format!("v-from-acct-{from}").into(), true.into()),
+            Interaction::Note(note) =>
+                if let Some(ref from) = note.from {
+                    headers.insert(format!("v-from-acct-{from}").into(), true.into())
+                },
         }
 
         // v-to-*
         match self {
-            Interaction::Note { note, .. } => {
+            Interaction::Note(note) => {
                 for list in [&note.to, &note.cc, &note.bto, &note.bcc] {
                     for recipient in list {
                         match recipient {

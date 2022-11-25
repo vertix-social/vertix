@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use aragog::Record;
 use lapin::Channel;
 use futures::stream::StreamExt;
@@ -87,13 +87,14 @@ async fn execute_action(
     db: &aragog::DatabaseConnection
 ) -> Result<ActionResponse> {
     match action {
-        Action::PublishNote { from, note } => {
-            let account = Account::find(&from, &*db).await?;
+        Action::PublishNote(note) => {
+            let from = note.from.as_ref()
+                .ok_or_else(|| anyhow!("note.from must be set"))?;
+
+            let account = Account::find(from, &*db).await?;
+
             let note_doc = Note::publish(&account, note.clone(), &*db).await?;
-            interactions.push(Interaction::Note {
-                from: from.to_owned(),
-                note: note_doc.clone()
-            });
+            interactions.push(Interaction::Note(note_doc.clone()));
             Ok(ActionResponse::PublishNote(note_doc))
         },
     }

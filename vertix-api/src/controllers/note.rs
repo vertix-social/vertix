@@ -43,10 +43,10 @@ pub async fn publish_note(
     let account = Account::find_by_username(&query.from_username, None, &*db).await?;
 
     let transaction = Transaction { actions: vec![
-        Action::PublishNote {
-            from: account.key().into(),
-            note: body.into_inner()
-        }
+        Action::PublishNote(Note {
+            from: Some(account.key().into()),
+            ..body.into_inner()
+        })
     ] };
 
     let response = transaction.remote_call(&ch).await?;

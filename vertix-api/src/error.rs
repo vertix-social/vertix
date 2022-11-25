@@ -1,5 +1,5 @@
 use core::convert::Infallible;
-use std::borrow::Cow;
+use std::{borrow::Cow, sync::Arc};
 
 use actix_web::{error::ResponseError, http::StatusCode};
 use activitystreams::primitives::{
@@ -11,6 +11,8 @@ use activitystreams::primitives::{
     XsdNonNegativeFloatError,
     XsdNonNegativeIntegerError,
 };
+
+use vertix_model::activitystreams::Error as ActivityStreamsError;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -24,10 +26,13 @@ pub enum Error {
     Pool(#[from] bb8::RunError<vertix_model::Error>),
 
     #[error("activity streams validation error: {0}")]
-    ActivityStreams(ActivityStreamsError),
+    ActivityStreams(#[from] ActivityStreamsError),
 
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),
+
+    #[error("url parse error: {0}")]
+    UrlParse(#[from] url::ParseError),
 
     #[error("internal error: {0}")]
     InternalError(Cow<'static, str>),
@@ -43,23 +48,27 @@ impl ResponseError for Error {
             Error::Comm(_) |
             Error::ActivityStreams(_) |
             Error::Io(_) |
+            Error::UrlParse(_) |
             Error::InternalError(_) =>
                 StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 }
 
-impl From<aragog::Error> for Error {
-    fn from(err: aragog::Error) -> Self {
-        vertix_model::Error::from(err).into()
+macro_rules! impl_via {
+    ($via:path | $($from:path),* $(,)?) => {
+        $(
+            impl From<$from> for Error {
+                fn from(err: $from) -> Self {
+                    <$via>::from(err).into()
+                }
+            }
+        )*
     }
 }
 
-impl From<lapin::Error> for Error {
-    fn from(err: lapin::Error) -> Self {
-        vertix_comm::Error::from(err).into()
-    }
-}
+impl_via!(vertix_model::Error | aragog::Error, Arc<aragog::Error>);
+impl_via!(vertix_comm::Error | lapin::Error);
 
 impl From<Infallible> for Error {
     fn from(_err: Infallible) -> Self {
@@ -67,28 +76,14 @@ impl From<Infallible> for Error {
     }
 }
 
-impl<T> From<T> for Error where ActivityStreamsError: From<T> {
-    fn from(err: T) -> Self {
-        ActivityStreamsError::from(err).into()
-    }
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum ActivityStreamsError{
-    #[error("{0}")]
-    XsdFloat(#[from] XsdFloatError),
-    #[error("{0}")]
-    XsdAnyUri(#[from] XsdAnyUriError),
-    #[error("{0}")]
-    XsdDateTime(#[from] XsdDateTimeError),
-    #[error("{0}")]
-    XsdDurationError(#[from] XsdDurationError),
-    #[error("{0}")]
-    MimeMediaTypeError(#[from] MimeMediaTypeError),
-    #[error("{0}")]
-    XsdNonNegativeFloatError(#[from] XsdNonNegativeFloatError),
-    #[error("{0}")]
-    XsdNonNegativeIntegerError(#[from] XsdNonNegativeIntegerError),
-}
+impl_via!(ActivityStreamsError |
+    XsdFloatError,
+    XsdAnyUriError,
+    XsdDateTimeError,
+    XsdDurationError,
+    MimeMediaTypeError,
+    XsdNonNegativeFloatError,
+    XsdNonNegativeIntegerError,
+);
 
 pub type Result<T> = std::result::Result<T, Error>;

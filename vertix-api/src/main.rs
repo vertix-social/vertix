@@ -1,6 +1,8 @@
 use actix_web::{get, web, App, HttpServer, Responder};
 use actix_web::middleware::Logger;
+use aragog::DatabaseAccess;
 use bb8::ErrorSink;
+use url::Url;
 
 use std::str::FromStr;
 use serde_json::json;
@@ -11,6 +13,7 @@ use vertix_model::AragogConnectionManager;
 
 mod formats;
 mod controllers;
+mod urls;
 mod error;
 
 pub use error::Error;
@@ -18,8 +21,21 @@ pub use error::Error;
 #[derive(Debug)]
 pub struct ApiState {
     domain: String,
+    base_url: Url,
     pool: bb8::Pool<AragogConnectionManager>,
     broker: lapin::Connection,
+}
+
+impl ApiState {
+    pub fn urls<'a, D>(&'a self, db: &'a D) -> crate::urls::Urls<'a, D>
+        where D: DatabaseAccess,
+    {
+        crate::urls::Urls::new(&self.base_url, db)
+    }
+
+    pub async fn db(&self) -> Result<bb8::PooledConnection<AragogConnectionManager>, Error> {
+        self.pool.get().await.map_err(|e| e.into())
+    }
 }
 
 #[get("/")]
@@ -85,6 +101,9 @@ async fn main() -> Result<()> {
             Please set it to the domain name Vertix can be reached at.");
     }
 
+    let base_url = Url::parse(&std::env::var("VERTIX_BASE_URL")
+        .unwrap_or_else(|_| format!("http://{domain}:{port}/")))?;
+
     let pool = bb8::Pool::builder()
         .error_sink(Box::new(LogErrorSink))
         .build(AragogConnectionManager)
@@ -97,7 +116,7 @@ async fn main() -> Result<()> {
 
     let broker = vertix_comm::create_connection().await?;
 
-    let state = ApiState { domain, pool, broker };
+    let state = ApiState { domain, base_url, pool, broker };
 
     serve(&host, port, state).await?;
 

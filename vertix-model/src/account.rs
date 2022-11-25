@@ -1,6 +1,9 @@
-use crate::{Error, Note, PageLimit, ApplyPageLimit};
-use aragog::{compare, DatabaseAccess, DatabaseRecord, Record, query::{QueryResult, Query, SortDirection}};
-use chrono::{DateTime, Utc};
+use crate::{Error, Note, PageLimit, ApplyPageLimit, activitystreams::{ToObject, UrlFor}};
+use async_trait::async_trait;
+use activitystreams::{ext::Ext, actor::{Person, properties::ApActorProperties}};
+use aragog::{compare, DatabaseAccess, DatabaseRecord, Record};
+use aragog::query::{QueryResult, Query, SortDirection};
+use chrono::{DateTime, Utc, FixedOffset};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use maplit::hashmap;
@@ -169,5 +172,44 @@ impl Account {
     fn before_save(&mut self) -> Result<(), aragog::Error> {
         self.updated_at = Some(Utc::now());
         Ok(())
+    }
+}
+
+#[async_trait(?Send)]
+impl ToObject for DatabaseRecord<Account> {
+    type Output = Ext<Person, ApActorProperties>;
+    type Error = crate::activitystreams::Error;
+
+    async fn to_object<U, E>(&self, urls: &U) -> Result<Self::Output, E>
+    where
+        U: UrlFor,
+        E: From<Self::Error> + From<U::Error>,
+    {
+        let mut person = Person::new();
+        let mut actor_properties = ApActorProperties::default();
+
+        let account_url = urls.url_for_account(self.key()).await?;
+        let inbox_url = urls.url_for_account_inbox(self.key()).await?;
+        let outbox_url = urls.url_for_account_outbox(self.key()).await?;
+
+        (|| {
+            let o = &mut person.object_props;
+
+            o.set_id(account_url)?;
+            o.set_context_xsd_any_uri(activitystreams::context())?;
+            o.set_name_xsd_string(self.username.to_owned())?;
+
+            if let Some(created_at) = self.created_at.clone() {
+                o.set_published(DateTime::<FixedOffset>::from(created_at))?;
+            }
+
+            actor_properties.set_preferred_username(self.username.clone())?;
+            actor_properties.set_inbox(inbox_url)?;
+            actor_properties.set_outbox(outbox_url)?;
+
+            Ok::<_, Self::Error>(())
+        })()?;
+
+        Ok(Ext { base: person, extension: actor_properties })
     }
 }
