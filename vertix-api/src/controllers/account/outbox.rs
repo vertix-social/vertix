@@ -31,6 +31,7 @@ pub async fn get_account_outbox(
         urls.url_for_account_outbox(account.key()).await?)?;
     collection.collection_props.set_first_xsd_any_uri(
         urls.url_for_account_outbox_page(account.key(), 1).await?)?;
+    collection.collection_props.set_total_items(1)?;
 
     Ok(ActivityJson(collection))
 }
