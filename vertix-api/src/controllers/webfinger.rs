@@ -1,10 +1,12 @@
 use actix_web::web;
 use actix_webfinger::Webfinger;
+use vertix_model::activitystreams::UrlFor;
 
 use crate::ApiState;
 
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::Arc;
 
 use vertix_model::Account;
 
@@ -30,10 +32,15 @@ impl actix_webfinger::Resolver for VertixResolver {
 
             Box::pin(async move {
                     let db = state.pool.get().await?;
+                    let urls = state.urls(&*db);
                     match Account::find_by_username(&account, None, &*db).await {
-                        Ok(_) => {
+                        Ok(m) => {
                             let mut wf = Webfinger::new(&format!("{account}@{domain}"));
-                            wf.add_activitypub(&format!("http://{domain}/users/{account}"));
+                            let m = Arc::new(m);
+                            urls.account_cache.put(m.clone()).await;
+
+                            let account_url = urls.url_for_account(m.key()).await?;
+                            wf.add_activitypub(account_url.as_str());
                             Ok(Some(wf))
                         },
                         Err(err) if err.is_not_found() => {
