@@ -31,6 +31,9 @@ pub enum Error {
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),
 
+    #[error("json error: {0}")]
+    Json(#[from] serde_json::Error),
+
     #[error("url parse error: {0}")]
     UrlParse(#[from] url::ParseError),
 
@@ -48,6 +51,7 @@ impl ResponseError for Error {
             Error::Comm(_) |
             Error::ActivityStreams(_) |
             Error::Io(_) |
+            Error::Json(_) |
             Error::UrlParse(_) |
             Error::InternalError(_) =>
                 StatusCode::INTERNAL_SERVER_ERROR,

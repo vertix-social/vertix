@@ -31,9 +31,15 @@ pub async fn get_account_outbox(
         urls.url_for_account_outbox(account.key()).await?)?;
     collection.collection_props.set_first_xsd_any_uri(
         urls.url_for_account_outbox_page(account.key(), 1).await?)?;
-    collection.collection_props.set_total_items(1)?;
 
-    Ok(ActivityJson(collection))
+    // We have to remove "items" from the output, since we are not going to be including any
+    let mut collection_json = serde_json::to_value(&collection)?;
+
+    collection_json.as_object_mut()
+        .ok_or(crate::Error::InternalError("collection json should be object".into()))?
+        .remove("items");
+
+    Ok(ActivityJson(collection_json))
 }
 
 #[get("/users/{username}/outbox/page/{page}")]
