@@ -6,9 +6,11 @@ use futures::stream::StreamExt;
 use log::{warn, debug};
 use vertix_comm::{SendMessage, ReceiveMessage, Delivery};
 use vertix_comm::messages::{Transaction, Action, Interaction, TransactionResponse, ActionResponse};
-use vertix_model::{AragogConnectionManager, Note, Account};
+use vertix_model::{AragogConnectionManager, Note, Account, Follow};
 
 pub async fn listen(ch: &Channel, pool: bb8::Pool<AragogConnectionManager>) -> Result<()> {
+    ch.basic_qos(2, Default::default()).await?;
+
     let mut stream = Transaction::receive(ch, "Transaction.process", Default::default()).await?;
 
     debug!("Listening for Transaction");
@@ -91,11 +93,59 @@ async fn execute_action(
             let from = note.from.as_ref()
                 .ok_or_else(|| anyhow!("note.from must be set"))?;
 
-            let account = Account::find(from, &*db).await?;
+            let account = Account::find(from, db).await?;
 
-            let note_doc = Note::publish(&account, note.clone(), &*db).await?;
+            let note_doc = Note::publish(&account, note.clone(), db).await?;
             interactions.push(Interaction::Note(note_doc.clone()));
             Ok(ActionResponse::PublishNote(note_doc))
         },
+        Action::InitiateFollow { from_account, to_account } => {
+            let actor = Account::find(&from_account, db).await?;
+            let target = Account::find(&to_account, db).await?;
+
+            let created;
+
+            if Follow::find_between(&actor, &target, db).await.is_err() {
+                Follow::link(&actor, &target, db).await?;
+
+                interactions.push(Interaction::InitiateFollow {
+                    from_account: actor.key().into(),
+                    to_account: target.key().into(),
+                    from_remote: actor.is_remote(),
+                    to_remote: actor.is_remote(),
+                });
+                created = true;
+            } else {
+                created = false;
+            }
+
+            Ok(ActionResponse::InitiateFollow { created })
+        },
+        Action::SetFollowAccepted { from_account, to_account, accepted } => {
+            let actor = Account::find(&from_account, db).await?;
+            let target = Account::find(&to_account, db).await?;
+            
+            let mut follow = Follow::find_between(&actor, &target, db).await?;
+
+            let modified;
+
+            if follow.accepted != Some(*accepted) {
+                follow.accepted = Some(*accepted);
+                follow.save(db).await?;
+
+                interactions.push(Interaction::SetFollowAccepted {
+                    from_account: actor.key().into(),
+                    to_account: target.key().into(),
+                    from_remote: actor.is_remote(),
+                    to_remote: actor.is_remote(),
+                    accepted: *accepted,
+                });
+                modified = true;
+            } else {
+                modified = false;
+            }
+
+            Ok(ActionResponse::SetFollowAccepted { modified })
+        }
     }
 }

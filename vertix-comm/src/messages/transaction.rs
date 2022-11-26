@@ -14,6 +14,15 @@ pub struct Transaction {
 #[serde(tag = "type", content = "params")]
 pub enum Action {
     PublishNote(Note),
+    InitiateFollow {
+        from_account: String,
+        to_account: String,
+    },
+    SetFollowAccepted {
+        from_account: String,
+        to_account: String,
+        accepted: bool,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -25,6 +34,8 @@ pub struct TransactionResponse {
 #[serde(tag = "type", content = "body")]
 pub enum ActionResponse {
     PublishNote(DatabaseRecord<Note>),
+    InitiateFollow { created: bool },
+    SetFollowAccepted { modified: bool },
 }
 
 impl SingleExchangeMessage for Transaction {

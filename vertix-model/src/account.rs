@@ -7,6 +7,7 @@ use chrono::{DateTime, Utc, FixedOffset};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use maplit::hashmap;
+use url::Url;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Record)]
 #[before_create(func = "before_create")]
@@ -20,9 +21,9 @@ pub struct Account {
     #[serde(default)]
     pub domain: Option<String>,
 
-    /// The uri at which the user's data can be found. None if local.
+    /// Information about a remote user. None if local.
     #[serde(default)]
-    pub uri: Option<String>,
+    pub remote: Option<RemoteAccountInfo>,
 
     #[serde(default)]
     pub created_at: Option<DateTime<Utc>>,
@@ -31,16 +32,51 @@ pub struct Account {
     pub updated_at: Option<DateTime<Utc>>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RemoteAccountInfo {
+    /// The uri at which the user's data can be found.
+    pub uri: Url,
+
+    /// The last time the remote user was fetched.
+    #[serde(default)]
+    pub last_remote_fetched_at: Option<String>,
+
+    /// Inbox url for remote user.
+    #[serde(default)]
+    pub inbox: Option<Url>,
+
+    /// Outbox url for remote user.
+    #[serde(default)]
+    pub outbox: Option<Url>,
+
+    /// Followers url for remote user.
+    #[serde(default)]
+    pub followers: Option<Url>,
+
+    /// Following url for remote user.
+    #[serde(default)]
+    pub following: Option<Url>,
+    
+}
+
 impl Account {
     /// Create account data with required fields set.
     pub fn new(username: String) -> Account {
         Account {
             username,
             domain: None,
-            uri: None,
+            remote: None,
             created_at: None,
             updated_at: None,
         }
+    }
+
+    pub fn is_local(&self) -> bool {
+        self.domain.is_none()
+    }
+
+    pub fn is_remote(&self) -> bool {
+        self.domain.is_some()
     }
 
     /// Find an account by username and domain. Use domain = `None` for a local account.
@@ -211,5 +247,18 @@ impl ToObject for DatabaseRecord<Account> {
         })()?;
 
         Ok(Ext { base: person, extension: actor_properties })
+    }
+}
+
+impl RemoteAccountInfo {
+    pub fn new(uri: Url) -> RemoteAccountInfo {
+        RemoteAccountInfo {
+            uri,
+            last_remote_fetched_at: None,
+            inbox: None,
+            outbox: None,
+            followers: None,
+            following: None,
+        }
     }
 }

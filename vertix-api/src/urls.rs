@@ -56,8 +56,8 @@ where
     async fn url_for_account(&self, key: &str) -> Result<Url> {
         let account = self.account_cache.get(key, self.db).await?;
 
-        if let Some(ref uri) = account.uri {
-            Ok(Url::parse(&uri)?)
+        if let Some(ref remote) = account.remote {
+            Ok(remote.uri.clone())
         } else {
             let username = encode(&account.username);
             Ok(self.base_url.join(&format!("users/{username}"))?)
@@ -82,8 +82,8 @@ where
     async fn url_for_note(&self, key: &str) -> Result<Url> {
         let note = self.note_cache.get(key, self.db).await?;
 
-        if let Some(ref uri) = note.uri {
-            Ok(Url::parse(uri)?)
+        if let Some(ref remote) = note.remote {
+            Ok(remote.uri.clone())
         } else {
             let from = note.from.as_ref()
                 .ok_or(Error::InternalError("note.from is missing".into()))?;

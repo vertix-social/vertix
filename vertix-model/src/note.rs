@@ -35,8 +35,9 @@ pub struct Note {
     #[serde(default)]
     pub from: Option<String>,
 
+    /// Some only if the Note comes from a remote source
     #[serde(default)]
-    pub uri: Option<String>,
+    pub remote: Option<RemoteNoteInfo>,
 
     #[serde(default)]
     pub to: Vec<Recipient>,
@@ -59,12 +60,18 @@ pub struct Note {
     pub updated_at: Option<DateTime<Utc>>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RemoteNoteInfo {
+    /// The uri of the remote note.
+    pub uri: Url,
+}
+
 impl Note {
     /// Create note data with required fields set.
     pub fn new(content: String) -> Note {
         Note {
             from: None,
-            uri: None,
+            remote: None,
             to: vec![],
             cc: vec![],
             bto: vec![],
@@ -169,5 +176,11 @@ impl ToObject for DatabaseRecord<Note> {
         })()?;
 
         Ok(note)
+    }
+}
+
+impl RemoteNoteInfo {
+    pub fn new(uri: Url) -> RemoteNoteInfo {
+        RemoteNoteInfo { uri }
     }
 }

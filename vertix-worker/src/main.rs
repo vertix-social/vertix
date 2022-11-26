@@ -7,6 +7,8 @@ use vertix_model::AragogConnectionManager;
 mod log_test_announce;
 mod process_transaction;
 mod log_interaction;
+mod send_interactions_to_remote;
+mod receive_activities;
 
 #[actix_rt::main]
 async fn main() -> Result<()> {
@@ -27,16 +29,19 @@ async fn main() -> Result<()> {
     let pool = bb8::Pool::builder().build(AragogConnectionManager).await?;
 
     macro_rules! start {
-        ($function:expr, $($arg:expr),*) => ({
+        ($function:expr, $($ident:ident = $arg:expr),*) => ({
             let channel = conn.create_channel().await?;
-            actix_rt::spawn(async move { $function(&channel, $($arg),*).await });
+            $(let $ident = $arg;)*
+            actix_rt::spawn(async move { $function(&channel, $($ident),*).await });
         });
         ($function:expr) => (start!($function,));
     }
 
     start!(log_test_announce::listen);
-    start!(process_transaction::listen, pool.clone());
+    start!(process_transaction::listen, pool = pool.clone());
     start!(log_interaction::listen);
+    start!(send_interactions_to_remote::listen, pool = pool.clone());
+    start!(receive_activities::listen, pool = pool.clone());
 
     info!("ready.");
 

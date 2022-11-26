@@ -25,11 +25,24 @@ use crate::{SingleExchangeMessage, ReceiveMessage, error::Result};
 #[serde(tag = "type", content = "params")]
 pub enum Interaction {
     Note(DatabaseRecord<Note>),
+    InitiateFollow {
+        from_account: String,
+        to_account: String,
+        from_remote: bool,
+        to_remote: bool,
+    },
+    SetFollowAccepted {
+        from_account: String,
+        to_account: String,
+        from_remote: bool,
+        to_remote: bool,
+        accepted: bool,
+    },
 }
 
 impl SingleExchangeMessage for Interaction {
     fn exchange() -> &'static str {
-        "PublishInteraction"
+        "Interaction"
     }
 
     fn amqp_properties(&self) -> AMQPProperties {
@@ -41,6 +54,9 @@ impl SingleExchangeMessage for Interaction {
                 if let Some(ref from) = note.from {
                     headers.insert(format!("v-from-acct-{from}").into(), true.into())
                 },
+            Interaction::InitiateFollow { from_account, .. } |
+            Interaction::SetFollowAccepted { from_account, .. } =>
+                headers.insert(format!("v-from-acct-{from_account}").into(), true.into()),
         }
 
         // v-to-*
@@ -56,7 +72,10 @@ impl SingleExchangeMessage for Interaction {
                         }
                     }
                 }
-            }
+            },
+            Interaction::InitiateFollow { to_account, .. } |
+            Interaction::SetFollowAccepted { to_account, .. } =>
+                headers.insert(format!("v-to-acct-{to_account}").into(), true.into()),
         }
 
         AMQPProperties::default().with_headers(headers)
@@ -66,11 +85,27 @@ impl SingleExchangeMessage for Interaction {
 impl Interaction {
     pub async fn setup(ch: &Channel) -> Result<()> {
         ch.exchange_declare(
-            "PublishInteraction",
+            "Interaction",
             ExchangeKind::Headers,
             ExchangeDeclareOptions { durable: true, ..Default::default() },
             Default::default()
         ).await?;
+
+        for q in ["Interaction.for_remote"] {
+            ch.queue_declare(
+                q,
+                QueueDeclareOptions { durable: true, ..Default::default() },
+                Default::default()
+            ).await?;
+
+            ch.queue_bind(
+                q,
+                "Interaction",
+                "",
+                Default::default(),
+                Default::default()
+            ).await?;
+        }
 
         Ok(())
     }
@@ -110,7 +145,7 @@ impl Interaction {
 
         ch.queue_bind(
             queue.name().as_str(),
-            "PublishInteraction",
+            "Interaction",
             "",
             Default::default(),
             headers

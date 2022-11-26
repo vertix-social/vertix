@@ -17,7 +17,7 @@ pub async fn listen(channel: &Channel) -> Result<()> {
                 info!("Interaction: {}", serde_json::to_string(&interaction).unwrap());
             },
             Err(err) => {
-                warn!("error in TestAnnounce: {}", err);
+                warn!("error in Interaction: {}", err);
             }
         }
     }

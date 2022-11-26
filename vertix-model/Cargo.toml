@@ -15,7 +15,7 @@ async-trait = "0.1"
 log = "0.4"
 maplit = "1.0"
 activitystreams = "0.6.2"
-url = "2.3.1"
+url = { version = "2.3.1", features = ["serde"] }
 async_cell = "0.2.1"
 futures = "0.3"
 chrono = { version = "0.4.23", features = ["serde"] }
