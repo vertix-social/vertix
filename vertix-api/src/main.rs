@@ -2,35 +2,31 @@ use actix_web::{get, web, App, HttpServer, Responder};
 use actix_web::middleware::Logger;
 use aragog::DatabaseAccess;
 use bb8::ErrorSink;
-use url::Url;
 
-use std::str::FromStr;
 use serde_json::json;
 use anyhow::Result;
 use log::{info, warn};
 
 use vertix_model::AragogConnectionManager;
+use vertix_app_common::{Urls, Config};
 
 mod formats;
 mod controllers;
-mod urls;
 mod error;
 
 pub use error::Error;
 
-#[derive(Debug)]
 pub struct ApiState {
-    domain: String,
-    base_url: Url,
+    config: Config,
     pool: bb8::Pool<AragogConnectionManager>,
     broker: lapin::Connection,
 }
 
 impl ApiState {
-    pub fn urls<'a, D>(&'a self, db: &'a D) -> crate::urls::Urls<'a, D>
+    pub fn urls<'a, D>(&'a self, db: &'a D) -> Urls<'a, D>
         where D: DatabaseAccess,
     {
-        crate::urls::Urls::new(&self.base_url, db)
+        Urls::new(&self.config.base_url, db)
     }
 
     pub async fn db(&self) -> Result<bb8::PooledConnection<AragogConnectionManager>, Error> {
@@ -46,15 +42,17 @@ async fn hello() -> impl Responder {
     }))
 }
 
-async fn serve(host: &str, port: u16, state: ApiState) -> Result<()> {
+async fn serve(state: web::Data<ApiState>) -> Result<()> {
+    let host = state.config.host.as_str();
+    let port = state.config.port;
     info!("Listening on [{host}]:{port}");
-    
-    let data = web::Data::new(state);
+
+    let state2 = state.clone();
 
     HttpServer::new(move || {
         App::new()
             .wrap(Logger::default())
-            .app_data(data.clone())
+            .app_data(state2.clone())
             .service(hello)
             .configure(controllers::config)
     })
@@ -85,24 +83,7 @@ async fn main() -> Result<()> {
             .default_filter_or("info")
     ).init();
 
-    let host: String = std::env::var("HOST").unwrap_or_else(|_| "127.0.0.1".into());
-
-    let port: u16 = match std::env::var("PORT") {
-        Ok(port_str) => u16::from_str(&port_str)?,
-        Err(_) => 8080
-    };
-
-    let domain = std::env::var("VERTIX_DOMAIN")
-        .unwrap_or_else(|_| "localhost".into());
-
-    if domain == "localhost" {
-        warn!("VERTIX_DOMAIN is currently set to localhost. \
-            This will not work properly. \
-            Please set it to the domain name Vertix can be reached at.");
-    }
-
-    let base_url = Url::parse(&std::env::var("VERTIX_BASE_URL")
-        .unwrap_or_else(|_| format!("http://{domain}:{port}/")))?;
+    let config = Config::from_env()?;
 
     let pool = bb8::Pool::builder()
         .error_sink(Box::new(LogErrorSink))
@@ -116,9 +97,16 @@ async fn main() -> Result<()> {
 
     let broker = vertix_comm::create_connection().await?;
 
-    let state = ApiState { domain, base_url, pool, broker };
+    let state = web::Data::new(ApiState { config, pool, broker });
 
-    serve(&host, port, state).await?;
+    serve(state).await?;
 
     Ok(())
+}
+
+pub(crate) fn make_awc_client() -> awc::Client {
+    awc::Client::builder()
+        .add_default_header(("User-Agent",
+            concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"))))
+        .finish()
 }

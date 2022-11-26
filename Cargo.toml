@@ -4,6 +4,7 @@ resolver = "2"
 members = [
   "vertix-model",
   "vertix-comm",
+  "vertix-app-common",
   "vertix-api",
   "vertix-worker"
 ]

@@ -32,18 +32,33 @@ impl<'a, D> Urls<'a, D> where D: DatabaseAccess {
 }
 
 macro_rules! url_for_account_suffix_impl {
-    ($name:ident ( $self:expr, $key:expr ) = format($fmt:literal)) => ({
-        let mut url = $self.url_for_account($key).await?;
+    ($name:ident ( $self:expr, $key:expr ) = format($fmt:literal) remote($field:ident)) => ({
+        let account = $self.account_cache.get($key, $self.db).await?;
 
-        if $self.is_own_url(&url) {
-            url.set_path(&format!($fmt, url.path()));
-            Ok(url)
+        if let Some(ref remote) = account.remote {
+            if let Some(ref $field) = remote.$field {
+                Ok($field.clone())
+            } else {
+                Err(Error::InternalError(concat!("can't ", stringify!($name),
+                    " on remote account because remote.", stringify!($field),
+                    " is missing").into()))
+            }
         } else {
-            // Not owned by us
-            Err(Error::InternalError(
-                concat!("can't ", stringify!($name), " for remote account").into()))
+            let username = encode(&account.username);
+            Ok($self.base_url.join(&format!($fmt, username = username))?)
         }
-    })
+    });
+    ($name:ident ( $self:expr, $key:expr ) = format($fmt:literal)) => ({
+        let account = $self.account_cache.get($key, $self.db).await?;
+
+        if account.is_remote() {
+            Err(Error::InternalError(concat!("can't ", stringify!($name),
+                " on remote account").into()))
+        } else {
+            let username = encode(&account.username);
+            Ok($self.base_url.join(&format!($fmt, username = username))?)
+        }
+    });
 }
 
 #[async_trait]
@@ -66,17 +81,17 @@ where
 
     async fn url_for_account_inbox(&self, key: &str) -> Result<Url> {
         url_for_account_suffix_impl!(url_for_account_inbox(self, key) =
-            format("{}/inbox"))
+            format("users/{username}/inbox") remote(inbox))
     }
 
     async fn url_for_account_outbox(&self, key: &str) -> Result<Url> {
         url_for_account_suffix_impl!(url_for_account_outbox(self, key) =
-            format("{}/outbox"))
+            format("users/{username}/outbox") remote(outbox))
     }
 
     async fn url_for_account_outbox_page(&self, key: &str, page: u32) -> Result<Url> {
         url_for_account_suffix_impl!(url_for_account_outbox_page(self, key) =
-            format("{}/outbox/page/{page}"))
+            format("users/{username}/outbox/page/{page}"))
     }
 
     async fn url_for_note(&self, key: &str) -> Result<Url> {

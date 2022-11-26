@@ -105,14 +105,14 @@ impl Account {
     }
 
     /// Find an account by their URI. This only works for foreign accounts.
-    pub async fn find_by_uri<D>(uri: &str, db: &D) -> Result<DatabaseRecord<Account>, Error>
+    pub async fn find_by_uri<D>(uri: &Url, db: &D) -> Result<DatabaseRecord<Account>, Error>
     where
         D: DatabaseAccess,
     {
         Ok(Account::get(
             &Account::query()
-                .bind_var("uri", uri)
-                .filter(compare!(field "uri").equals("@uri").into()),
+                .bind_var("uri", uri.to_string())
+                .filter(compare!(field "remote.uri").equals("@uri").into()),
             db,
         )
         .await?
@@ -247,6 +247,35 @@ impl ToObject for DatabaseRecord<Account> {
         })()?;
 
         Ok(Ext { base: person, extension: actor_properties })
+    }
+}
+
+impl TryFrom<Ext<Person, ApActorProperties>> for Account {
+    type Error = crate::error::Error;
+
+    fn try_from(person: Ext<Person, ApActorProperties>) -> Result<Self, Self::Error> {
+        let missing = |s: &'static str| Error::ConversionMissingField(s.into());
+        let id = person.base.object_props.get_id().ok_or(missing("id"))?;
+
+        Ok(Account {
+            username: person.extension.get_preferred_username()
+                .ok_or(missing("preferred_username"))?.clone().into_string(),
+            // This is just a best guess at the domain. It can be refined by a webfinger.
+            domain: id.as_url().host_str().map(|s| s.to_owned()),
+            remote: Some(RemoteAccountInfo {
+                uri: id.as_url().clone(),
+                // we don't know, whoever is consuming this should set it.
+                last_remote_fetched_at: None,
+                inbox: Some(person.extension.get_inbox().as_url().clone()),
+                outbox: Some(person.extension.get_outbox().as_url().clone()),
+                followers: person.extension.get_followers().map(|u| u.as_url().clone()),
+                following: person.extension.get_following().map(|u| u.as_url().clone()),
+            }),
+            created_at: person.base.object_props.get_published()
+                .map(|d| d.as_datetime().clone().into()),
+            updated_at: person.base.object_props.get_updated()
+                .map(|d| d.as_datetime().clone().into()),
+        })
     }
 }
 

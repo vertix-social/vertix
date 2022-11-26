@@ -1,26 +1,28 @@
 use lapin::Channel;
 use serde::{Serialize, Deserialize};
+use url::Url;
 use activitystreams::activity::ActivityBox;
 use crate::{SingleExchangeMessage, error::Result, macros::setup_exchange};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ReceiveActivity {
+pub struct DeliverActivity {
+    pub inbox: Url,
     pub activity: ActivityBox,
 }
 
-impl SingleExchangeMessage for ReceiveActivity {
+impl SingleExchangeMessage for DeliverActivity {
     fn exchange() -> &'static str {
-        "ReceiveActivity"
+        "DeliverActivity"
     }
 }
 
-impl ReceiveActivity {
+impl DeliverActivity {
     pub async fn setup(ch: &Channel) -> Result<()> {
         setup_exchange!(ch,
-            ReceiveActivity {
+            DeliverActivity {
                 kind Direct
                 queues [
-                    "ReceiveActivity.process"
+                    "DeliverActivity.process"
                 ]
             }
         );

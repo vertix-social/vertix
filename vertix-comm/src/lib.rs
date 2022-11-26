@@ -18,6 +18,8 @@ pub mod error;
 pub use error::Error;
 use error::Result;
 
+mod macros;
+
 #[async_trait(?Send)]
 pub trait SendMessage {
     async fn send(&self, channel: &Channel) -> Result<PublisherConfirm>;
@@ -101,26 +103,33 @@ pub struct Delivery<M> {
 }
 
 impl<M> Delivery<M> {
+    /// Get a reference to the data contained in the message.
     pub fn data(&self) -> &M {
         &self.data
     }
 
+    /// Get the raw message properties.
     pub fn properties(&self) -> &AMQPProperties {
         &self.properties
     }
 
+    /// Do positive acknowledgement of the message.
     pub async fn ack(&self) -> Result<()> {
         Ok(self.acker.ack(Default::default()).await?)
     }
 
+    /// Do negative acknowledgement of the message.
     pub async fn nack(&self) -> Result<()> {
         Ok(self.acker.nack(Default::default()).await?)
     }
 
+    /// True if the message has a reply address.
     pub fn wants_reply(&self) -> bool {
         self.properties.reply_to().is_some()
     }
 
+    /// Reply to the delivery with a reply message. The data will only be sent if
+    /// `self.wants_reply()` is true - i.e., there is a reply address in the message header.
     pub async fn reply(&self, channel: &Channel, body: &impl Serialize) -> Result<()> {
         if let Some(reply_to) = self.properties.reply_to() {
             let serialized = serde_json::to_vec(body)?;
@@ -135,6 +144,15 @@ impl<M> Delivery<M> {
         }
 
         Ok(())
+    }
+
+    /// Split a delivery into its metadata + data as a tuple. The new Delivery will have () as its
+    /// data.
+    ///
+    /// This is useful for taking ownership of the inner data.
+    pub fn split_data(self) -> (Delivery<()>, M) {
+        let Delivery { data, acker, properties } = self;
+        (Delivery { data: (), acker, properties }, data)
     }
 }
 

@@ -26,7 +26,7 @@ impl actix_webfinger::Resolver for VertixResolver {
         domain: &str,
         state: Self::State,
     ) -> Pin<Box<dyn Future<Output = Result<Option<Webfinger>, Self::Error>>>> {
-        if scheme == Some("acct:") && domain == state.domain {
+        if scheme == Some("acct:") && domain == state.config.domain {
             let account = account.to_owned();
             let domain = domain.to_owned();
 

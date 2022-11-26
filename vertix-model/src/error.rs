@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, borrow::Cow};
 
 use aragog::Error as AragogError;
 
@@ -9,6 +9,9 @@ pub enum Error {
 
     #[error("ActivityStreams error: {0}")]
     ActivityStreams(#[source] crate::activitystreams::Error),
+
+    #[error("Conversion failed: missing field: {0}")]
+    ConversionMissingField(Cow<'static, str>),
 }
 
 impl Error {

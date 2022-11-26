@@ -37,8 +37,14 @@ pub enum Error {
     #[error("url parse error: {0}")]
     UrlParse(#[from] url::ParseError),
 
+    #[error("webfinger error: {0}")]
+    Webfinger(#[from] actix_webfinger::FetchError),
+
     #[error("internal error: {0}")]
     InternalError(Cow<'static, str>),
+
+    #[error("not found")]
+    NotFound,
 }
 
 impl ResponseError for Error {
@@ -46,6 +52,11 @@ impl ResponseError for Error {
         match self {
             Error::Model(ref err) => StatusCode::from_u16(err.http_code())
                 .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR),
+
+            // Assumption. Not sure if correct
+            Error::Webfinger(_) => StatusCode::NOT_FOUND,
+
+            Error::NotFound => StatusCode::NOT_FOUND,
 
             Error::Pool(_) |
             Error::Comm(_) |
@@ -89,5 +100,17 @@ impl_via!(ActivityStreamsError |
     XsdNonNegativeFloatError,
     XsdNonNegativeIntegerError,
 );
+
+impl From<vertix_app_common::Error> for Error {
+    fn from(err: vertix_app_common::Error) -> Self {
+        use vertix_app_common::Error::*;
+        match err {
+            Model(m) => m.into(),
+            Comm(c) => c.into(),
+            UrlParse(u) => u.into(),
+            InternalError(e) => Error::InternalError(e),
+        }
+    }
+}
 
 pub type Result<T> = std::result::Result<T, Error>;

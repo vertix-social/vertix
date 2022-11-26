@@ -1,6 +1,6 @@
-use lapin::{Channel, ExchangeKind};
+use lapin::Channel;
 use lapin::types::{FieldTable, LongString};
-use lapin::options::{ExchangeDeclareOptions, QueueDeclareOptions, BasicConsumeOptions};
+use lapin::options::{QueueDeclareOptions, BasicConsumeOptions};
 use lapin::protocol::basic::AMQPProperties;
 
 use serde::{Serialize, Deserialize};
@@ -8,7 +8,7 @@ use aragog::DatabaseRecord;
 use futures::stream::{Stream, TryStreamExt};
 use vertix_model::{Note, Recipient};
 
-use crate::{SingleExchangeMessage, ReceiveMessage, error::Result};
+use crate::{SingleExchangeMessage, ReceiveMessage, macros::setup_exchange, error::Result};
 
 /// Announces that an interaction has been committed.
 ///
@@ -84,28 +84,15 @@ impl SingleExchangeMessage for Interaction {
 
 impl Interaction {
     pub async fn setup(ch: &Channel) -> Result<()> {
-        ch.exchange_declare(
-            "Interaction",
-            ExchangeKind::Headers,
-            ExchangeDeclareOptions { durable: true, ..Default::default() },
-            Default::default()
-        ).await?;
-
-        for q in ["Interaction.for_remote"] {
-            ch.queue_declare(
-                q,
-                QueueDeclareOptions { durable: true, ..Default::default() },
-                Default::default()
-            ).await?;
-
-            ch.queue_bind(
-                q,
-                "Interaction",
-                "",
-                Default::default(),
-                Default::default()
-            ).await?;
-        }
+        setup_exchange!(ch,
+            Interaction {
+                kind Headers
+                queues [
+                    // For sending interactions to remote federated servers
+                    "Interaction.for_remote",
+                ]
+            }
+        );
 
         Ok(())
     }
