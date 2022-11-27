@@ -146,7 +146,7 @@ async fn execute_action(
                     from_account: actor.key().into(),
                     to_account: target.key().into(),
                     from_remote: actor.is_remote(),
-                    to_remote: actor.is_remote(),
+                    to_remote: target.is_remote(),
                 });
                 created = true;
             } else {
@@ -172,7 +172,7 @@ async fn execute_action(
                     from_account: actor.key().into(),
                     to_account: target.key().into(),
                     from_remote: actor.is_remote(),
-                    to_remote: actor.is_remote(),
+                    to_remote: target.is_remote(),
                     accepted: *accepted,
                 });
                 modified = true;
