@@ -1,6 +1,7 @@
 use serde::{Serialize, Deserialize};
 use aragog::{Record, EdgeRecord, DatabaseRecord, DatabaseAccess, compare};
 use chrono::{DateTime, Utc};
+use serde_json::json;
 use crate::{Account, Error};
 
 macro_rules! created_at_hook {
@@ -55,7 +56,10 @@ impl Follow {
                     compare!(field "_from").equals("@from")
                         .and(compare!(field "_to").equals("@to")).into()),
             db
-        ).await?.first_record().unwrap())
+        ).await?.first_record().ok_or_else(|| Error::NotFound {
+            model: "Follow".into(),
+            params: json!({"_from": actor.id(), "_to": target.id()})
+        })?)
     }
 
     created_at_hook!();
