@@ -278,12 +278,16 @@ impl Account {
     }
 
     fn before_create(&mut self) -> Result<(), aragog::Error> {
-        self.created_at = Some(Utc::now());
+        if self.is_local() {
+            self.created_at = Some(Utc::now());
+        }
         Ok(())
     }
 
     fn before_save(&mut self) -> Result<(), aragog::Error> {
-        self.updated_at = Some(Utc::now());
+        if self.is_local() {
+            self.updated_at = Some(Utc::now());
+        }
         Ok(())
     }
 }

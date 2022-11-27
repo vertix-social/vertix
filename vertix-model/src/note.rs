@@ -82,6 +82,14 @@ impl Note {
         }
     }
 
+    pub fn is_local(&self) -> bool {
+        self.remote.is_none()
+    }
+
+    pub fn is_remote(&self) -> bool {
+        self.remote.is_some()
+    }
+
     /// Publish a new note from the publisher. Creates a Note record and Publish edge.
     ///
     /// `note.from` will be set to `publisher.key()`.
@@ -104,12 +112,16 @@ impl Note {
     }
 
     fn before_create(&mut self) -> Result<(), aragog::Error> {
-        self.created_at = Some(Utc::now());
+        if self.is_local() {
+            self.created_at = Some(Utc::now());
+        }
         Ok(())
     }
 
     fn before_save(&mut self) -> Result<(), aragog::Error> {
-        self.updated_at = Some(Utc::now());
+        if self.is_local() {
+            self.updated_at = Some(Utc::now());
+        }
         Ok(())
     }
 }
