@@ -71,8 +71,8 @@ impl Follow {
     {
         Ok(EdgeRecord::get(
             &Follow::query()
-                .bind_var("from", actor.key().as_str())
-                .bind_var("to", target.key().as_str())
+                .bind_var("from", actor.id().as_str())
+                .bind_var("to", target.id().as_str())
                 .filter(
                     compare!(field "_from").equals("@from")
                         .and(compare!(field "_to").equals("@to")).into()),
@@ -81,6 +81,36 @@ impl Follow {
             model: "Follow".into(),
             params: json!({"_from": actor.id(), "_to": target.id()})
         })?)
+    }
+
+    // Find pending follows from an account.
+    pub async fn find_pending_from<D>(from: &DatabaseRecord<Account>, db: &D)
+        -> Result<Vec<Edge<Follow>>, Error>
+    where
+        D: DatabaseAccess,
+    {
+        Ok(EdgeRecord::get(
+            &Follow::query()
+                .bind_var("from", from.id().as_str())
+                .filter(compare!(field "_from").equals("@from")
+                    .and(compare!(field "accepted").equals("null")).into()),
+            db
+        ).await?.wrap())
+    }
+
+    // Find pending follows to an account.
+    pub async fn find_pending_to<D>(to: &DatabaseRecord<Account>, db: &D)
+        -> Result<Vec<Edge<Follow>>, Error>
+    where
+        D: DatabaseAccess,
+    {
+        Ok(EdgeRecord::get(
+            &Follow::query()
+                .bind_var("to", to.id().as_str())
+                .filter(compare!(field "_to").equals("@to")
+                    .and(compare!(field "accepted").equals("null")).into()),
+            db
+        ).await?.wrap())
     }
 
     created_at_hook!();

@@ -45,6 +45,9 @@ pub enum Error {
 
     #[error("not found")]
     NotFound,
+
+    #[error("conflict: {0}")]
+    Conflict(Cow<'static, str>)
 }
 
 impl ResponseError for Error {
@@ -57,6 +60,7 @@ impl ResponseError for Error {
             Error::WebfingerFetch(_) => StatusCode::NOT_FOUND,
 
             Error::NotFound => StatusCode::NOT_FOUND,
+            Error::Conflict(_) => StatusCode::CONFLICT,
 
             Error::Pool(_) |
             Error::Comm(_) |
