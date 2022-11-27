@@ -36,7 +36,8 @@ async fn lookup_account(
             // Fetch remote account
             let awc = crate::make_awc_client();
 
-            let wf = Webfinger::fetch(&awc, None,
+            let wf = Webfinger::fetch(&awc,
+                Some("acct:"),
                 &username,
                 domain.as_deref().unwrap(),
                 true).await?;
