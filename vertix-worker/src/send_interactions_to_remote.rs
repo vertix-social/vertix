@@ -82,7 +82,7 @@ async fn process_interaction(
                 log::debug!("Send {}/Follow to remote {follow:?}",
                     if accepted { "Accept" } else { "Reject" });
                 let follow_activity = follow.to_object::<_, anyhow::Error>(&urls).await?;
-                let inbox = urls.url_for_account_inbox(&follow.key_to()).await?;
+                let inbox = urls.url_for_account_inbox(&follow.key_from()).await?;
                 let activity = if accepted {
                     make_follow_response::<activity::Accept>(follow_activity)?.try_into()?
                 } else {
