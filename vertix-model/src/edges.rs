@@ -135,7 +135,7 @@ impl ToObject for Edge<Follow> {
             follow_activity.object_props.set_context_xsd_any_uri(activitystreams::context())?;
             follow_activity.object_props.set_id(self.uri.clone().unwrap_or_else(|| {
                 let mut url = from_url.clone();
-                url.set_fragment(Some(&format!("self/{}", self.key())));
+                url.set_fragment(Some(&format!("follows/{}", self.key())));
                 url
             }))?;
             follow_activity.follow_props.set_actor_xsd_any_uri(from_url)?;
