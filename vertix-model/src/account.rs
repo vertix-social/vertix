@@ -1,6 +1,10 @@
 use crate::{Error, Note, PageLimit, ApplyPageLimit, activitystreams::{ToObject, UrlFor}};
 use async_trait::async_trait;
-use activitystreams::{ext::Ext, actor::{Person, properties::ApActorProperties}};
+use activitystreams::{
+    ext::Ext,
+    actor::{Person, properties::ApActorProperties},
+    endpoint::EndpointProperties
+};
 use aragog::{compare, DatabaseAccess, DatabaseRecord, Record};
 use aragog::query::{QueryResult, Query, SortDirection};
 use chrono::{DateTime, Utc, FixedOffset};
@@ -138,6 +142,29 @@ impl Account {
         ).await?)
     }
 
+    /// Count the number of notes that this account has published.
+    pub async fn count_published_notes<D>(
+        record: &DatabaseRecord<Account>,
+        db: &D
+    ) -> Result<u64, Error>
+    where
+        D: DatabaseAccess,
+    {
+        let mut res: Vec<u64> = db.database()
+            .aql_bind_vars(r#"
+                WITH Publish
+                FOR edge in Publish
+                    FILTER edge._from == @account_id
+                        AND is_same_collection("Note", edge._to)
+                    COLLECT WITH COUNT INTO length
+                    RETURN length
+            "#, hashmap! {
+                "account_id" => json!(record.id())
+            })
+            .await.map_err(aragog::Error::from)?;
+        Ok(res.pop().unwrap_or(0))
+    }
+
     /// Get the list of accounts that this account is following.
     pub async fn get_following<D>(
         record: &DatabaseRecord<Account>,
@@ -155,6 +182,28 @@ impl Account {
         ).await?)
     }
 
+    /// Count the number of accounts that this account is following.
+    pub async fn count_following<D>(
+        record: &DatabaseRecord<Account>,
+        db: &D
+    ) -> Result<u64, Error>
+    where
+        D: DatabaseAccess,
+    {
+        let mut res: Vec<u64> = db.database()
+            .aql_bind_vars(r#"
+                WITH Follow
+                FOR edge in Follow
+                    FILTER edge._from == @account_id
+                    COLLECT WITH COUNT INTO length
+                    RETURN length
+            "#, hashmap! {
+                "account_id" => json!(record.id())
+            })
+            .await.map_err(aragog::Error::from)?;
+        Ok(res.pop().unwrap_or(0))
+    }
+
     /// Get the list of accounts that are following this account.
     pub async fn get_followers<D>(
         record: &DatabaseRecord<Account>,
@@ -170,6 +219,28 @@ impl Account {
                 .with_collections(&["Account", "Follow"]),
             db
         ).await?)
+    }
+
+    /// Count the number of accounts that are following this account.
+    pub async fn count_followers<D>(
+        record: &DatabaseRecord<Account>,
+        db: &D
+    ) -> Result<u64, Error>
+    where
+        D: DatabaseAccess,
+    {
+        let mut res: Vec<u64> = db.database()
+            .aql_bind_vars(r#"
+                WITH Follow
+                FOR edge in Follow
+                    FILTER edge._to == @account_id
+                    COLLECT WITH COUNT INTO length
+                    RETURN length
+            "#, hashmap! {
+                "account_id" => json!(record.id())
+            })
+            .await.map_err(aragog::Error::from)?;
+        Ok(res.pop().unwrap_or(0))
     }
 
     /// Get the latest posts that this account's followers have published or announced.
@@ -227,6 +298,9 @@ impl ToObject for DatabaseRecord<Account> {
         let account_url = urls.url_for_account(self.key()).await?;
         let inbox_url = urls.url_for_account_inbox(self.key()).await?;
         let outbox_url = urls.url_for_account_outbox(self.key()).await?;
+        let followers_url = urls.url_for_account_followers(self.key()).await?;
+        let following_url = urls.url_for_account_following(self.key()).await?;
+        let shared_inbox_url = urls.url_for_shared_inbox()?;
 
         (|| {
             let o = &mut person.object_props;
@@ -242,6 +316,12 @@ impl ToObject for DatabaseRecord<Account> {
             actor_properties.set_preferred_username(self.username.clone())?;
             actor_properties.set_inbox(inbox_url)?;
             actor_properties.set_outbox(outbox_url)?;
+            actor_properties.set_followers(followers_url)?;
+            actor_properties.set_following(following_url)?;
+            actor_properties.set_endpoints(EndpointProperties {
+                shared_inbox: Some(shared_inbox_url.into()),
+                ..Default::default()
+            })?;
 
             Ok::<_, Self::Error>(())
         })()?;

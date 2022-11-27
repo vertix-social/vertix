@@ -1,8 +1,7 @@
 use actix_web::{web, get, Responder};
 use actix_webfinger::Webfinger;
 use serde::Deserialize;
-use vertix_comm::RpcMessage;
-use vertix_comm::messages::{Transaction, Action, ActionResponse};
+use vertix_comm::{expect_reply_of, messages::{Action, ActionResponse}};
 use vertix_model::Account;
 
 use crate::{ApiState, Error};
@@ -43,14 +42,10 @@ async fn lookup_account(
                 .ok_or(Error::NotFound)?.href.as_deref()
                 .ok_or(Error::NotFound)?.try_into()?;
 
-            let mut reply = Transaction { actions: vec![
-                Action::FetchAccount(url),
-            ] }.remote_call(&ch).await?;
-
-            let account = match reply.responses.pop() {
-                Some(ActionResponse::FetchAccount(account)) => account,
-                _ => return Err(Error::InternalError("wrong response type for action".into()))
-            };
+            let account = expect_reply_of!(
+                Action::FetchAccount(url).remote_call(&ch).await?;
+                ActionResponse::FetchAccount(account) => account
+            )?;
 
             Ok(web::Json(account))
         },

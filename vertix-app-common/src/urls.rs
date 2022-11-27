@@ -94,6 +94,26 @@ where
             format("users/{username}/outbox/page/{page}"))
     }
 
+    async fn url_for_account_followers(&self, key: &str) -> Result<Url> {
+        url_for_account_suffix_impl!(url_for_account_followers(self, key) =
+            format("users/{username}/followers") remote(followers))
+    }
+
+    async fn url_for_account_followers_page(&self, key: &str, page: u32) -> Result<Url> {
+        url_for_account_suffix_impl!(url_for_account_followers_page(self, key) =
+            format("users/{username}/followers/page/{page}"))
+    }
+
+    async fn url_for_account_following(&self, key: &str) -> Result<Url> {
+        url_for_account_suffix_impl!(url_for_account_following(self, key) =
+            format("users/{username}/following") remote(following))
+    }
+
+    async fn url_for_account_following_page(&self, key: &str, page: u32) -> Result<Url> {
+        url_for_account_suffix_impl!(url_for_account_following_page(self, key) =
+            format("users/{username}/following/page/{page}"))
+    }
+
     async fn url_for_note(&self, key: &str) -> Result<Url> {
         let note = self.note_cache.get(key, self.db).await?;
 
@@ -107,5 +127,9 @@ where
             url.set_path(&format!("{}/notes/{encoded_key}", url.path()));
             Ok(url)
         }
+    }
+
+    fn url_for_shared_inbox(&self) -> Result<Url> {
+        Ok(self.base_url.join("inbox")?)
     }
 }

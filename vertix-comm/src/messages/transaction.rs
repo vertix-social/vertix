@@ -1,10 +1,16 @@
 use aragog::DatabaseRecord;
-use lapin::Channel;
+use lapin::{Channel, publisher_confirm::PublisherConfirm};
 use serde::{Serialize, Deserialize};
 use url::Url;
 use vertix_model::{Note, Account};
 
-use crate::{error::Result, SingleExchangeMessage, RpcMessage, macros::setup_exchange};
+use crate::{
+    error::{Error, Result},
+    macros::setup_exchange,
+    SingleExchangeMessage,
+    SendMessage,
+    RpcMessage,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Transaction {
@@ -68,5 +74,27 @@ impl Transaction {
         );
 
         Ok(())
+    }
+}
+
+impl Action {
+    pub fn into_transaction(self) -> Transaction {
+        Transaction { actions: vec![self] }        
+    }
+
+    pub async fn send(self, ch: &Channel) -> Result<PublisherConfirm> {
+        self.into_transaction().send(ch).await
+    }
+
+    pub async fn remote_call(self, ch: &Channel) -> Result<ActionResponse> {
+        let TransactionResponse { mut responses } =
+            self.into_transaction().remote_call(ch).await?;
+
+        if responses.len() == 1 {
+            Ok(responses.pop().unwrap())
+        } else {
+            Err(Error::InvalidReply(
+                format!("should have exactly one response: {:?}", responses).into()))
+        }
     }
 }

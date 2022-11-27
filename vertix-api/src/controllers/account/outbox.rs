@@ -1,9 +1,19 @@
 use std::sync::Arc;
 
-use activitystreams::{collection::{OrderedCollection, OrderedCollectionPage}, activity};
+use activitystreams::activity;
 use actix_web::{web, get, Responder};
 use futures::{stream::FuturesOrdered, TryStreamExt};
-use vertix_model::{Account, PageLimit, activitystreams::{ToObject, make_actor_and_object_activity, UrlFor}};
+use vertix_model::{
+    Account,
+    PageLimit,
+    activitystreams::{
+        ToObject,
+        UrlFor,
+        make_actor_and_object_activity,
+        make_ordered_collection,
+        make_ordered_collection_page
+    },
+};
 
 use crate::{ApiState, error::Result, formats::ActivityJson};
 
@@ -24,22 +34,13 @@ pub async fn get_account_outbox(
     let account: Arc<_> = Account::find_by_username(&*username, None, &*db).await?.into();
     urls.account_cache.put(account.clone()).await;
 
-    let mut collection = OrderedCollection::new();
+    let collection = make_ordered_collection(
+        urls.url_for_account_outbox(account.key()).await?,
+        urls.url_for_account_outbox_page(account.key(), 1).await?,
+        Account::count_published_notes(&account, &*db).await?
+    )?;
 
-    collection.object_props.set_context_xsd_any_uri(activitystreams::context())?;
-    collection.object_props.set_id(
-        urls.url_for_account_outbox(account.key()).await?)?;
-    collection.collection_props.set_first_xsd_any_uri(
-        urls.url_for_account_outbox_page(account.key(), 1).await?)?;
-
-    // We have to remove "items" from the output, since we are not going to be including any
-    let mut collection_json = serde_json::to_value(&collection)?;
-
-    collection_json.as_object_mut()
-        .ok_or(crate::Error::InternalError("collection json should be object".into()))?
-        .remove("items");
-
-    Ok(ActivityJson(collection_json))
+    Ok(ActivityJson(collection))
 }
 
 #[get("/users/{username}/outbox/page/{page}")]
@@ -57,10 +58,6 @@ pub async fn get_account_outbox_page(
     let account: Arc<_> = Account::find_by_username(&*username, None, &*db).await?.into();
     urls.account_cache.put(account.clone()).await;
 
-    let mut col_page = OrderedCollectionPage::new();
-
-    col_page.object_props.set_context_xsd_any_uri(activitystreams::context())?;
-
     let notes = urls.note_cache.put_many(
         Account::get_published_notes(&account, page_limit, &*db).await?.0).await;
 
@@ -73,15 +70,12 @@ pub async fn get_account_outbox_page(
         })
     ).try_collect().await?;
 
-    col_page.collection_page_props.set_part_of_xsd_any_uri(
-        urls.url_for_account_outbox(account.key()).await?)?;
-
-    if items.len() >= page_limit.limit as usize {
-        col_page.collection_page_props.set_next_xsd_any_uri(
-            urls.url_for_account_outbox_page(account.key(), page + 1).await?)?;
-    }
-
-    col_page.collection_props.set_many_items_base_boxes(items)?;
+    let col_page = make_ordered_collection_page(
+        Some(page_limit),
+        urls.url_for_account_outbox(account.key()).await?,
+        Some(urls.url_for_account_outbox_page(account.key(), page + 1).await?),
+        items
+    )?;
 
     Ok(ActivityJson(col_page))
 }

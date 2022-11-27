@@ -1,11 +1,10 @@
 use actix_web::{web, get, post, Responder};
 use aragog::Record;
 use vertix_model::{Note, Account};
-use vertix_comm::messages::{Transaction, Action, ActionResponse};
-use vertix_comm::RpcMessage;
+use vertix_comm::messages::{Action, ActionResponse};
+use vertix_comm::expect_reply_of;
 use serde::Deserialize;
 
-use crate::Error;
 use crate::{error::Result, ApiState};
 
 pub fn config(cfg: &mut web::ServiceConfig) {
@@ -42,17 +41,14 @@ pub async fn publish_note(
 
     let account = Account::find_by_username(&query.from_username, None, &*db).await?;
 
-    let transaction = Transaction { actions: vec![
+    let note = expect_reply_of!(
         Action::PublishNote(Note {
             from: Some(account.key().into()),
             ..body.into_inner()
-        })
-    ] };
+        }).remote_call(&ch).await?;
 
-    let response = transaction.remote_call(&ch).await?;
+        ActionResponse::PublishNote(note) => note
+    )?;
 
-    match &*response.responses {
-        [ActionResponse::PublishNote(note)] => Ok(web::Json(note.clone())),
-        _ => Err(Error::InternalError("bad reply from worker".into()))
-    }
+    Ok(web::Json(note))
 }

@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("json error")]
@@ -11,6 +13,9 @@ pub enum Error {
 
     #[error("no reply to rpc call")]
     NoReply,
+
+    #[error("reply was not as expected: {0}")]
+    InvalidReply(Cow<'static, str>),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

@@ -19,6 +19,7 @@ pub async fn setup(ch: &Channel) -> Result<()> {
         Transaction::setup(ch),
         Interaction::setup(ch),
         ReceiveActivity::setup(ch),
+        DeliverActivity::setup(ch),
     )?;
 
     Ok(())
