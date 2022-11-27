@@ -47,17 +47,15 @@ impl Follow {
     where
         D: DatabaseAccess,
     {
-        Ok(DatabaseRecord::link(
-            actor,
-            target,
-            db,
-            Follow {
-                from_remote: actor.is_remote(),
-                to_remote: target.is_remote(),
-                uri,
-                ..Follow::default()
-            }
-        ).await?.wrap())
+        let mut follow = Follow::default();
+
+        follow.from_remote = actor.is_remote();
+        follow.to_remote = target.is_remote();
+        follow.uri = uri;
+
+        log::debug!("Initiating follow: {follow:?}");
+
+        Ok(DatabaseRecord::link(actor, target, db, follow).await?.wrap())
     }
 
     /// Find follow between two accounts.
