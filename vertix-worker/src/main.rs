@@ -1,6 +1,6 @@
 use anyhow::Result;
 use log::info;
-use vertix_app_common::Config;
+use vertix_app_common::{Config, helpers::build_reqwest_client};
 use std::{future::Future, sync::Arc};
 use futures::stream::StreamExt;
 use lapin::Channel;
@@ -35,9 +35,7 @@ async fn main() -> Result<()> {
 
     let pool = bb8::Pool::builder().build(AragogConnectionManager).await?;
 
-    let client = reqwest::Client::builder()
-        .user_agent(concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION")))
-        .build()?;
+    let reqwest = build_reqwest_client(&config)?;
 
     macro_rules! start {
         ($function:expr, $($ident:ident = $arg:expr),*) => ({
@@ -49,11 +47,11 @@ async fn main() -> Result<()> {
     }
 
     start!(log_test_announce::listen);
-    start!(process_transaction::listen, pool = pool.clone(), client = client.clone());
+    start!(process_transaction::listen, pool = pool.clone(), client = reqwest.clone());
     start!(log_interaction::listen);
     start!(send_interactions_to_remote::listen, config = config.clone(), pool = pool.clone());
     start!(receive_activities::listen, config = config.clone(), pool = pool.clone());
-    start!(deliver_activities::listen, client = client.clone());
+    start!(deliver_activities::listen, client = reqwest.clone());
 
     info!("ready.");
 

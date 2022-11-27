@@ -7,6 +7,7 @@ use serde_json::json;
 use anyhow::Result;
 use log::{info, warn};
 
+use vertix_app_common::helpers::build_reqwest_client;
 use vertix_model::AragogConnectionManager;
 use vertix_app_common::{Urls, Config};
 
@@ -98,9 +99,7 @@ async fn main() -> Result<()> {
 
     let broker = vertix_comm::create_connection().await?;
 
-    let reqwest = reqwest::Client::builder()
-        .user_agent(concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION")))
-        .build()?;
+    let reqwest = build_reqwest_client(&config)?;
 
     let state = web::Data::new(ApiState { config, pool, broker, reqwest });
 

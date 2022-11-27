@@ -1,3 +1,5 @@
+use std::{fs::File, io::Read};
+
 use actix_webfinger::Webfinger;
 use aragog::DatabaseAccess;
 use lapin::Channel;
@@ -79,4 +81,19 @@ pub async fn webfinger(
     }.await;
 
     result.map_err(Error::WebfingerFetch)
+}
+
+pub fn build_reqwest_client(config: &Config) -> anyhow::Result<reqwest::Client> {
+    let mut builder = reqwest::Client::builder()
+        .user_agent(concat!("vertix/", env!("CARGO_PKG_VERSION")));
+
+    for path in &config.trusted_certificate_files {
+        let mut file = File::open(path)?;
+        let mut buf = vec![];
+        file.read_to_end(&mut buf)?;
+        let cert = reqwest::Certificate::from_pem(&buf)?;
+        builder = builder.add_root_certificate(cert);
+    }
+
+    Ok(builder.build()?)
 }

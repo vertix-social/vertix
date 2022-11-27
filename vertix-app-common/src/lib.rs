@@ -1,4 +1,4 @@
-use std::{env, str::FromStr};
+use std::{env, str::FromStr, path::PathBuf};
 use url::Url;
 
 mod urls;
@@ -16,6 +16,7 @@ pub struct Config {
     pub port: u16,
     pub domain: String,
     pub base_url: Url,
+    pub trusted_certificate_files: Vec<PathBuf>,
 }
 
 impl Config {
@@ -40,11 +41,16 @@ impl Config {
         let base_url = Url::parse(&env::var("VERTIX_BASE_URL")
             .unwrap_or_else(|_| format!("http://{domain}:{port}/")))?;
 
+        let trusted_certificate_files = env::var("VERTIX_TRUSTED_CERTS")
+            .map(|value| value.split(",").map(|s| s.into()).collect())
+            .unwrap_or_else(|_| vec![]);
+
         Ok(Config {
             host,
             port,
             domain,
             base_url,
+            trusted_certificate_files,
         })
     }
 
