@@ -92,7 +92,7 @@ impl Account {
     where
         D: DatabaseAccess,
     {
-        Ok(Account::get(
+        Account::get(
             &Account::query()
                 .bind_var("username", username)
                 .bind_var("domain", domain)
@@ -105,7 +105,10 @@ impl Account {
         )
         .await?
         .first_record()
-        .unwrap())
+        .ok_or_else(|| Error::NotFound {
+            model: "Account".into(),
+            params: json!({"username": username, "domain": domain})
+        })
     }
 
     /// Find an account by their URI. This only works for foreign accounts.
@@ -113,7 +116,7 @@ impl Account {
     where
         D: DatabaseAccess,
     {
-        Ok(Account::get(
+        Account::get(
             &Account::query()
                 .bind_var("uri", uri.to_string())
                 .filter(compare!(field "remote.uri").equals("@uri").into()),
@@ -121,7 +124,10 @@ impl Account {
         )
         .await?
         .first_record()
-        .unwrap())
+        .ok_or_else(|| Error::NotFound {
+            model: "Account".into(),
+            params: json!({"uri": uri})
+        })
     }
 
     /// Get the notes that this account has published.

@@ -12,6 +12,12 @@ pub enum Error {
 
     #[error("Conversion failed: missing field: {0}")]
     ConversionMissingField(Cow<'static, str>),
+
+    #[error("Not found: {model} ({params})")]
+    NotFound {
+        model: Cow<'static, str>,
+        params: serde_json::Value,
+    },
 }
 
 impl Error {
@@ -21,6 +27,7 @@ impl Error {
                 AragogError::NotFound { .. } => true,
                 _ => false
             },
+            Error::NotFound { .. } => true,
             _ => false
         }
     }
@@ -28,6 +35,7 @@ impl Error {
     pub fn http_code(&self) -> u16 {
         match self {
             Error::Aragog(err) => err.http_code(),
+            Error::NotFound { .. } => 404,
             _ => 500,
         }
     }
