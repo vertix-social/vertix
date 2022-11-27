@@ -23,7 +23,12 @@ async fn lookup_account(
     query: web::Query<LookupQueryParams>,
 ) -> Result<impl Responder> {
     let db = state.pool.get().await?;
-    let LookupQueryParams { username, domain } = query.into_inner();
+    let LookupQueryParams { username, mut domain } = query.into_inner();
+
+    // Handle own domain
+    if domain.as_deref() == Some(&state.config.domain) {
+        domain = None;
+    }
 
     match Account::find_by_username(&username, domain.as_deref(), &*db).await {
         Ok(account) => Ok(web::Json(account)),
