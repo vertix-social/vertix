@@ -1,4 +1,12 @@
-use crate::{Error, Note, PageLimit, ApplyPageLimit, activitystreams::{ToObject, UrlFor}, Document, Wrap};
+use crate::{
+    Error,
+    Note,
+    PageLimit,
+    ApplyPageLimit,
+    activitystreams::{ToObject, UrlFor},
+    Document,
+    Wrap
+};
 use async_trait::async_trait;
 use activitystreams::{
     ext::Ext,
@@ -182,12 +190,21 @@ impl Account {
     where
         D: DatabaseAccess,
     {
-        Ok(Account::get(
-            &Query::outbound(1, 1, "Follow", record.id().as_str())
-                .apply_page_limit(page_limit)
-                .with_collections(&["Account", "Follow"]),
-            db
-        ).await?.wrap())
+        let limit = page_limit.to_aql();
+        Ok(db.database()
+            .aql_bind_vars(&format!(r#"
+                WITH Follow, Account
+                FOR edge in Follow
+                    FILTER edge._from == @account_id
+                       AND edge.accepted == true
+                    FOR doc in Account
+                        FILTER doc._id == edge._to
+                        {limit}
+                        RETURN doc
+            "#), hashmap! {
+                "account_id" => json!(record.id())
+            })
+            .await.map_err(aragog::Error::from)?)
     }
 
     /// Count the number of accounts that this account is following.
@@ -203,6 +220,7 @@ impl Account {
                 WITH Follow
                 FOR edge in Follow
                     FILTER edge._from == @account_id
+                       AND edge.accepted == true
                     COLLECT WITH COUNT INTO length
                     RETURN length
             "#, hashmap! {
@@ -221,12 +239,21 @@ impl Account {
     where
         D: DatabaseAccess,
     {
-        Ok(Account::get(
-            &Query::inbound(1, 1, "Follow", record.id().as_str())
-                .apply_page_limit(page_limit)
-                .with_collections(&["Account", "Follow"]),
-            db
-        ).await?.wrap())
+        let limit = page_limit.to_aql();
+        Ok(db.database()
+            .aql_bind_vars(&format!(r#"
+                WITH Follow, Account
+                FOR edge in Follow
+                    FILTER edge._to == @account_id
+                       AND edge.accepted == true
+                    FOR doc in Account
+                        FILTER doc._id == edge._from
+                        {limit}
+                        RETURN doc
+            "#), hashmap! {
+                "account_id" => json!(record.id())
+            })
+            .await.map_err(aragog::Error::from)?)
     }
 
     /// Count the number of accounts that are following this account.
@@ -242,6 +269,7 @@ impl Account {
                 WITH Follow
                 FOR edge in Follow
                     FILTER edge._to == @account_id
+                       AND edge.accepted == true
                     COLLECT WITH COUNT INTO length
                     RETURN length
             "#, hashmap! {
@@ -267,6 +295,7 @@ impl Account {
                 FOR account IN Account
                     FILTER account._key == @account_key
                     FOR note, edge, path IN 2..2 OUTBOUND account Follow, Publish, Share
+                        FILTER path.edges[0].accepted == true
                         SORT path.edges[1].created_at DESC
                         LIMIT @offset, @limit
                         RETURN note
