@@ -6,6 +6,8 @@ use std::fmt;
 use std::future::Future;
 use std::sync::Arc;
 
+use crate::{Wrap, Wrapper};
+
 /// An asynchronous cache meant to be used for unifying requests to other objects over a short
 /// period of time. For example, fetching related models over the lifetime of a request.
 ///
@@ -90,17 +92,22 @@ where
 
 /// A cache for db records
 #[derive(Debug, Clone)]
-pub struct RecordCache<T> {
-    cache: ShortLivedCache<String, Result<Arc<DatabaseRecord<T>>, Arc<aragog::Error>>>,
+pub struct RecordCache<W> {
+    cache: ShortLivedCache<String, Result<Arc<W>, Arc<aragog::Error>>>,
 }
 
-impl<T> RecordCache<T> where T: Record + Send {
-    pub fn new() -> RecordCache<T> {
+impl<W, T> RecordCache<W>
+where
+    T: Record + Send,
+    DatabaseRecord<T>: Wrap<W>,
+    W: Wrapper<For=DatabaseRecord<T>>
+{
+    pub fn new() -> RecordCache<W> {
         RecordCache { cache: ShortLivedCache::new() }
     }
 
     /// Pre-populate a record cache with the given records.
-    pub fn new_with(records: impl IntoIterator<Item=Arc<DatabaseRecord<T>>>) -> RecordCache<T> {
+    pub fn new_with(records: impl IntoIterator<Item=Arc<W>>) -> RecordCache<W> {
         RecordCache {
             cache: ShortLivedCache::new_with(
                 records.into_iter().map(|record| (record.key().to_owned(), Ok(record)))
@@ -110,25 +117,25 @@ impl<T> RecordCache<T> where T: Record + Send {
 
     /// Get a record from the cache, looking it up if not present.
     pub async fn get<D>(&self, key: &str, db: &D)
-        -> Result<Arc<DatabaseRecord<T>>, Arc<aragog::Error>>
+        -> Result<Arc<W>, Arc<aragog::Error>>
     where
         D: DatabaseAccess,
     {
         self.cache.get(key, || async {
-            T::find(key, db).await.map(Arc::from).map_err(Arc::from)
+            let wrapped: W = T::find(key, db).await?.wrap();
+            Ok(Arc::new(wrapped))
         }).await
     }
 
     /// Insert a record into the cache
-    pub async fn put(&self, record: Arc<DatabaseRecord<T>>) {
+    pub async fn put(&self, record: Arc<W>) {
         self.cache.put(record.key().to_owned(), Ok(record)).await
     }
 
     /// Insert many records into the cache
-    pub async fn put_many<A>(&self, records: impl IntoIterator<Item = A>)
-        -> Vec<Arc<DatabaseRecord<T>>>
+    pub async fn put_many<A>(&self, records: impl IntoIterator<Item = A>) -> Vec<Arc<W>>
     where
-        A: Into<Arc<DatabaseRecord<T>>>,
+        A: Into<Arc<W>>,
     {
         let mut out = vec![];
 

@@ -59,7 +59,7 @@ pub async fn get_account_followers_page(
     urls.account_cache.put(account.clone()).await;
 
     let followers = urls.account_cache.put_many(
-        Account::get_followers(&account, page_limit, &*db).await?.0).await;
+        Account::get_followers(&account, page_limit, &*db).await?).await;
 
     // Output should be a collection page of Person
     let items: Vec<_> = FuturesOrdered::from_iter(
@@ -113,7 +113,7 @@ pub async fn get_account_following_page(
     urls.account_cache.put(account.clone()).await;
 
     let following = urls.account_cache.put_many(
-        Account::get_following(&account, page_limit, &*db).await?.0).await;
+        Account::get_following(&account, page_limit, &*db).await?).await;
 
     // Output should be a collection page of Person
     let items: Vec<_> = FuturesOrdered::from_iter(

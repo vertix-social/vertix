@@ -1,8 +1,7 @@
-use aragog::DatabaseRecord;
 use lapin::{Channel, publisher_confirm::PublisherConfirm};
 use serde::{Serialize, Deserialize};
 use url::Url;
-use vertix_model::{Note, Account};
+use vertix_model::{Note, Account, Follow, Edge, Document};
 
 use crate::{
     error::{Error, Result},
@@ -28,11 +27,11 @@ pub enum Action {
     InitiateFollow {
         from_account: String,
         to_account: String,
+        uri: Option<Url>,
     },
     /// Accept or reject a follow between two accounts.
     SetFollowAccepted {
-        from_account: String,
-        to_account: String,
+        key: String,
         accepted: bool,
     },
 }
@@ -45,10 +44,10 @@ pub struct TransactionResponse {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", content = "body")]
 pub enum ActionResponse {
-    FetchAccount(DatabaseRecord<Account>),
-    PublishNote(DatabaseRecord<Note>),
-    InitiateFollow { created: bool },
-    SetFollowAccepted { modified: bool },
+    FetchAccount(Document<Account>),
+    PublishNote(Document<Note>),
+    InitiateFollow { created: bool, follow: Edge<Follow> },
+    SetFollowAccepted { modified: bool, follow: Edge<Follow> },
 }
 
 impl SingleExchangeMessage for Transaction {

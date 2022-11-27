@@ -1,12 +1,12 @@
-use crate::{Error, Note, PageLimit, ApplyPageLimit, activitystreams::{ToObject, UrlFor}};
+use crate::{Error, Note, PageLimit, ApplyPageLimit, activitystreams::{ToObject, UrlFor}, Document, Wrap};
 use async_trait::async_trait;
 use activitystreams::{
     ext::Ext,
     actor::{Person, properties::ApActorProperties},
     endpoint::EndpointProperties
 };
-use aragog::{compare, DatabaseAccess, DatabaseRecord, Record};
-use aragog::query::{QueryResult, Query, SortDirection};
+use aragog::{compare, DatabaseAccess, Record};
+use aragog::query::{Query, SortDirection};
 use chrono::{DateTime, Utc, FixedOffset};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -88,7 +88,7 @@ impl Account {
         username: &str,
         domain: Option<&str>,
         db: &D,
-    ) -> Result<DatabaseRecord<Account>, Error>
+    ) -> Result<Document<Account>, Error>
     where
         D: DatabaseAccess,
     {
@@ -105,6 +105,7 @@ impl Account {
         )
         .await?
         .first_record()
+        .wrap()
         .ok_or_else(|| Error::NotFound {
             model: "Account".into(),
             params: json!({"username": username, "domain": domain})
@@ -112,7 +113,7 @@ impl Account {
     }
 
     /// Find an account by their URI. This only works for foreign accounts.
-    pub async fn find_by_uri<D>(uri: &Url, db: &D) -> Result<DatabaseRecord<Account>, Error>
+    pub async fn find_by_uri<D>(uri: &Url, db: &D) -> Result<Document<Account>, Error>
     where
         D: DatabaseAccess,
     {
@@ -124,6 +125,7 @@ impl Account {
         )
         .await?
         .first_record()
+        .wrap()
         .ok_or_else(|| Error::NotFound {
             model: "Account".into(),
             params: json!({"uri": uri})
@@ -132,10 +134,10 @@ impl Account {
 
     /// Get the notes that this account has published.
     pub async fn get_published_notes<D>(
-        record: &DatabaseRecord<Account>,
+        record: &Document<Account>,
         page_limit: PageLimit,
         db: &D
-    ) -> Result<QueryResult<Note>, Error>
+    ) -> Result<Vec<Document<Note>>, Error>
     where
         D: DatabaseAccess,
     {
@@ -145,12 +147,12 @@ impl Account {
                 .sort("created_at", Some(SortDirection::Desc))
                 .with_collections(&["Account", "Publish", "Note"]),
             db
-        ).await?)
+        ).await?.wrap())
     }
 
     /// Count the number of notes that this account has published.
     pub async fn count_published_notes<D>(
-        record: &DatabaseRecord<Account>,
+        record: &Document<Account>,
         db: &D
     ) -> Result<u64, Error>
     where
@@ -173,10 +175,10 @@ impl Account {
 
     /// Get the list of accounts that this account is following.
     pub async fn get_following<D>(
-        record: &DatabaseRecord<Account>,
+        record: &Document<Account>,
         page_limit: PageLimit,
         db: &D
-    ) -> Result<QueryResult<Account>, Error>
+    ) -> Result<Vec<Document<Account>>, Error>
     where
         D: DatabaseAccess,
     {
@@ -185,12 +187,12 @@ impl Account {
                 .apply_page_limit(page_limit)
                 .with_collections(&["Account", "Follow"]),
             db
-        ).await?)
+        ).await?.wrap())
     }
 
     /// Count the number of accounts that this account is following.
     pub async fn count_following<D>(
-        record: &DatabaseRecord<Account>,
+        record: &Document<Account>,
         db: &D
     ) -> Result<u64, Error>
     where
@@ -212,10 +214,10 @@ impl Account {
 
     /// Get the list of accounts that are following this account.
     pub async fn get_followers<D>(
-        record: &DatabaseRecord<Account>,
+        record: &Document<Account>,
         page_limit: PageLimit,
         db: &D
-    ) -> Result<QueryResult<Account>, Error>
+    ) -> Result<Vec<Document<Account>>, Error>
     where
         D: DatabaseAccess,
     {
@@ -224,12 +226,12 @@ impl Account {
                 .apply_page_limit(page_limit)
                 .with_collections(&["Account", "Follow"]),
             db
-        ).await?)
+        ).await?.wrap())
     }
 
     /// Count the number of accounts that are following this account.
     pub async fn count_followers<D>(
-        record: &DatabaseRecord<Account>,
+        record: &Document<Account>,
         db: &D
     ) -> Result<u64, Error>
     where
@@ -251,15 +253,15 @@ impl Account {
 
     /// Get the latest posts that this account's followers have published or announced.
     pub async fn get_timeline<D>(
-        record: &DatabaseRecord<Account>,
+        record: &Document<Account>,
         page_limit: PageLimit,
         db: &D
-    ) -> Result<QueryResult<Note>, Error> 
+    ) -> Result<Vec<Document<Note>>, Error> 
     where
         D: DatabaseAccess,
     {
         // Really impossible to do this efficiently without a raw query
-        let res: Vec<DatabaseRecord<Note>> = db.database()
+        let res: Vec<Document<Note>> = db.database()
             .aql_bind_vars(r#"
                 WITH Account, Follow, Publish, Share, Note
                 FOR account IN Account
@@ -274,7 +276,7 @@ impl Account {
                 "limit" => json!(page_limit.limit)
             })
             .await.map_err(aragog::Error::from)?;
-        Ok(QueryResult(res))
+        Ok(res)
     }
 
     fn before_create(&mut self) -> Result<(), aragog::Error> {
@@ -293,7 +295,7 @@ impl Account {
 }
 
 #[async_trait(?Send)]
-impl ToObject for DatabaseRecord<Account> {
+impl ToObject for Document<Account> {
     type Output = Ext<Person, ApActorProperties>;
     type Error = crate::activitystreams::Error;
 

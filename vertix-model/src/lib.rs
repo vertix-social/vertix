@@ -1,4 +1,5 @@
 mod connection;
+mod wrappers;
 mod account;
 mod note;
 mod edges;
@@ -9,6 +10,7 @@ mod cache;
 pub mod activitystreams;
 
 pub use crate::connection::*;
+pub use crate::wrappers::*;
 pub use crate::account::*;
 pub use crate::note::*;
 pub use crate::edges::*;

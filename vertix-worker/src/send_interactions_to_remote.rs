@@ -5,13 +5,13 @@ use activitystreams::activity::properties::ActorAndObjectProperties;
 
 use lapin::Channel;
 use anyhow::Result;
-use aragog::{Record, DatabaseAccess};
+use aragog::Record;
 use anyhow::anyhow;
 
 use vertix_comm::{SendMessage, ReceiveMessage};
 use vertix_comm::messages::{Interaction, DeliverActivity};
 use vertix_model::{AragogConnectionManager, Account};
-use vertix_model::activitystreams::UrlFor;
+use vertix_model::activitystreams::{UrlFor, ToObject};
 use vertix_app_common::{Urls, Config};
 
 use futures::stream::StreamExt;
@@ -65,56 +65,35 @@ async fn process_interaction(
             }
         },
 
-        Interaction::InitiateFollow {
-            from_account, to_account, to_remote, ..
-        } if *to_remote => {
-            let to = urls.account_cache.get(to_account, &*db).await?;
+        Interaction::InitiateFollow(follow) if follow.to_remote => {
+            let to = urls.account_cache.get(follow.key_to(), &*db).await?;
             if to.is_remote() {
-                log::debug!("Send Follow to remote {from_account} -> {to_account}");
-                let follow = make_follow(&from_account, &to_account, &urls).await?;
-                let inbox = urls.url_for_account_inbox(&to_account).await?;
-                DeliverActivity { inbox, activity: follow.try_into()? }.send(&ch).await?;
+                log::debug!("Send Follow to remote {follow:?}");
+                let follow_activity = follow.to_object::<_, anyhow::Error>(&urls).await?;
+                let inbox = urls.url_for_account_inbox(&follow.key_to()).await?;
+                DeliverActivity { inbox, activity: follow_activity.try_into()? }.send(&ch).await?;
             }
         },
 
-        Interaction::SetFollowAccepted {
-            from_account, to_account, from_remote, accepted, ..
-        } if *from_remote => {
-            let to = urls.account_cache.get(to_account, &*db).await?;
-            if to.is_remote() {
-                log::debug!("Send {}/Follow to remote {from_account} -> {to_account}",
-                    if *accepted { "Accept" } else { "Reject" });
-                let follow = make_follow(&from_account, &to_account, &urls).await?;
-                let inbox = urls.url_for_account_inbox(&to_account).await?;
-                let activity;
-                if *accepted {
-                    activity = make_follow_response::<activity::Accept>(follow)?.try_into()?;
+        Interaction::SetFollowAccepted(follow) if follow.from_remote => {
+            let accepted = follow.accepted.expect("Accepted not set even after SetFollowAccepted");
+            let from = urls.account_cache.get(follow.key_from(), &*db).await?;
+            if from.is_remote() {
+                log::debug!("Send {}/Follow to remote {follow:?}",
+                    if accepted { "Accept" } else { "Reject" });
+                let follow_activity = follow.to_object::<_, anyhow::Error>(&urls).await?;
+                let inbox = urls.url_for_account_inbox(&follow.key_to()).await?;
+                let activity = if accepted {
+                    make_follow_response::<activity::Accept>(follow_activity)?.try_into()?
                 } else {
-                    activity = make_follow_response::<activity::Reject>(follow)?.try_into()?;
-                }
+                    make_follow_response::<activity::Reject>(follow_activity)?.try_into()?
+                };
                 DeliverActivity { inbox, activity }.send(&ch).await?;
             }
         },
         _ => ()
     }
     Ok(())
-}
-
-async fn make_follow<D>(from: &str, to: &str, urls: &Urls<'_, D>) -> Result<activity::Follow>
-    where D: DatabaseAccess,
-{
-    let (from_url, to_url) = futures::try_join!(
-        urls.url_for_account(from),
-        urls.url_for_account(to),
-    )?;
-
-    let mut follow = activity::Follow::new();
-
-    follow.object_props.set_context_xsd_any_uri(activitystreams::context())?;
-    follow.follow_props.set_actor_xsd_any_uri(from_url)?;
-    follow.follow_props.set_object_xsd_any_uri(to_url)?;
-
-    Ok(follow)
 }
 
 fn make_follow_response<A>(follow: activity::Follow) -> Result<A>

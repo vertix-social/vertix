@@ -4,9 +4,8 @@ use lapin::options::{QueueDeclareOptions, BasicConsumeOptions};
 use lapin::protocol::basic::AMQPProperties;
 
 use serde::{Serialize, Deserialize};
-use aragog::DatabaseRecord;
 use futures::stream::{Stream, TryStreamExt};
-use vertix_model::{Note, Recipient};
+use vertix_model::{Note, Recipient, Document, Edge, Follow};
 
 use crate::{SingleExchangeMessage, ReceiveMessage, macros::setup_exchange, error::Result};
 
@@ -24,20 +23,9 @@ use crate::{SingleExchangeMessage, ReceiveMessage, macros::setup_exchange, error
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", content = "params")]
 pub enum Interaction {
-    Note(DatabaseRecord<Note>),
-    InitiateFollow {
-        from_account: String,
-        to_account: String,
-        from_remote: bool,
-        to_remote: bool,
-    },
-    SetFollowAccepted {
-        from_account: String,
-        to_account: String,
-        from_remote: bool,
-        to_remote: bool,
-        accepted: bool,
-    },
+    Note(Document<Note>),
+    InitiateFollow(Edge<Follow>),
+    SetFollowAccepted(Edge<Follow>),
 }
 
 impl SingleExchangeMessage for Interaction {
@@ -54,9 +42,9 @@ impl SingleExchangeMessage for Interaction {
                 if let Some(ref from) = note.from {
                     headers.insert(format!("v-from-acct-{from}").into(), true.into())
                 },
-            Interaction::InitiateFollow { from_account, .. } |
-            Interaction::SetFollowAccepted { from_account, .. } =>
-                headers.insert(format!("v-from-acct-{from_account}").into(), true.into()),
+            Interaction::InitiateFollow(follow) |
+            Interaction::SetFollowAccepted(follow) =>
+                headers.insert(format!("v-from-acct-{}", follow.key_from()).into(), true.into()),
         }
 
         // v-to-*
@@ -73,9 +61,9 @@ impl SingleExchangeMessage for Interaction {
                     }
                 }
             },
-            Interaction::InitiateFollow { to_account, .. } |
-            Interaction::SetFollowAccepted { to_account, .. } =>
-                headers.insert(format!("v-to-acct-{to_account}").into(), true.into()),
+            Interaction::InitiateFollow(follow) |
+            Interaction::SetFollowAccepted(follow) =>
+                headers.insert(format!("v-to-acct-{}", follow.key_to()).into(), true.into()),
         }
 
         AMQPProperties::default().with_headers(headers)

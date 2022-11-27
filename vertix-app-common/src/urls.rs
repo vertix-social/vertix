@@ -1,5 +1,5 @@
 use aragog::DatabaseAccess;
-use vertix_model::{RecordCache, Account, Note};
+use vertix_model::{RecordCache, Account, Note, Document};
 use vertix_model::activitystreams::UrlFor;
 use crate::error::*;
 use url::Url;
@@ -9,8 +9,8 @@ use async_trait::async_trait;
 #[derive(Debug, Clone)]
 pub struct Urls<'a, D> {
     pub base_url: &'a Url,
-    pub account_cache: RecordCache<Account>,
-    pub note_cache: RecordCache<Note>,
+    pub account_cache: RecordCache<Document<Account>>,
+    pub note_cache: RecordCache<Document<Note>>,
     pub db: &'a D,
 }
 

@@ -2,14 +2,14 @@ use std::sync::Arc;
 
 use activitystreams::{ext::Ext, actor::{Person, properties::ApActorProperties}};
 use anyhow::{Result, anyhow, bail};
-use aragog::Record;
+use aragog::{Record, EdgeRecord};
 use chrono::Utc;
 use lapin::Channel;
 
 use log::{warn, debug};
 use vertix_comm::{SendMessage, Delivery};
 use vertix_comm::messages::{Transaction, Action, Interaction, TransactionResponse, ActionResponse};
-use vertix_model::{AragogConnectionManager, Note, Account, Follow};
+use vertix_model::{AragogConnectionManager, Note, Account, Follow, Wrap, Edge};
 
 use crate::process_queue;
 
@@ -114,7 +114,7 @@ async fn execute_action(
                 },
                 Err(e) if e.is_not_found() => {
                     // Create a new account
-                    account = Account::create(account_body, db).await?;
+                    account = Account::create(account_body, db).await?.wrap();
                 },
                 Err(e) => return Err(e.into()),
             }
@@ -126,41 +126,35 @@ async fn execute_action(
             let from = note.from.as_ref()
                 .ok_or_else(|| anyhow!("note.from must be set"))?;
 
-            let account = Account::find(from, db).await?;
+            let account = Account::find(from, db).await?.wrap();
 
             let note_doc = Note::publish(&account, note.clone(), db).await?;
             interactions.push(Interaction::Note(note_doc.clone()));
             Ok(ActionResponse::PublishNote(note_doc))
         },
 
-        Action::InitiateFollow { from_account, to_account } => {
+        Action::InitiateFollow { from_account, to_account, uri } => {
             let actor = Account::find(&from_account, db).await?;
             let target = Account::find(&to_account, db).await?;
 
             let created;
+            let follow;
 
-            if Follow::find_between(&actor, &target, db).await.is_err() {
-                Follow::link(&actor, &target, db).await?;
-
-                interactions.push(Interaction::InitiateFollow {
-                    from_account: actor.key().into(),
-                    to_account: target.key().into(),
-                    from_remote: actor.is_remote(),
-                    to_remote: target.is_remote(),
-                });
-                created = true;
-            } else {
+            if let Ok(found_follow) = Follow::find_between(&actor, &target, db).await {
+                follow = found_follow;
                 created = false;
+            } else {
+                follow = Follow::link(&actor, &target, uri.clone(), db).await?;
+                created = true;
+
+                interactions.push(Interaction::InitiateFollow(follow.clone()));
             }
 
-            Ok(ActionResponse::InitiateFollow { created })
+            Ok(ActionResponse::InitiateFollow { created, follow })
         },
 
-        Action::SetFollowAccepted { from_account, to_account, accepted } => {
-            let actor = Account::find(&from_account, db).await?;
-            let target = Account::find(&to_account, db).await?;
-            
-            let mut follow = Follow::find_between(&actor, &target, db).await?;
+        Action::SetFollowAccepted { key, accepted } => {
+            let mut follow: Edge<Follow> = EdgeRecord::<Follow>::find(&key, db).await?.wrap();
 
             let modified;
 
@@ -168,19 +162,13 @@ async fn execute_action(
                 follow.accepted = Some(*accepted);
                 follow.save(db).await?;
 
-                interactions.push(Interaction::SetFollowAccepted {
-                    from_account: actor.key().into(),
-                    to_account: target.key().into(),
-                    from_remote: actor.is_remote(),
-                    to_remote: target.is_remote(),
-                    accepted: *accepted,
-                });
+                interactions.push(Interaction::SetFollowAccepted(follow.clone()));
                 modified = true;
             } else {
                 modified = false;
             }
 
-            Ok(ActionResponse::SetFollowAccepted { modified })
+            Ok(ActionResponse::SetFollowAccepted { modified, follow })
         }
     }
 }

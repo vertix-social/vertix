@@ -1,12 +1,12 @@
 use activitystreams::object;
 use async_trait::async_trait;
 use serde::{Serialize, Deserialize};
-use aragog::{Record, DatabaseAccess, DatabaseRecord, Validate};
+use aragog::{Record, DatabaseAccess, Validate, DatabaseRecord};
 use chrono::{DateTime, Utc, FixedOffset};
 use url::Url;
 use futures::stream::{FuturesOrdered, TryStreamExt};
 
-use crate::{Error, Account, Publish, activitystreams::{ToObject, UrlFor}};
+use crate::{Error, Account, Publish, Document, Wrap, activitystreams::{ToObject, UrlFor}};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -94,10 +94,10 @@ impl Note {
     ///
     /// `note.from` will be set to `publisher.key()`.
     pub async fn publish<D>(
-        publisher: &DatabaseRecord<Account>,
+        publisher: &Document<Account>,
         note: Note,
         db: &D
-    ) -> Result<DatabaseRecord<Note>, Error>
+    ) -> Result<Document<Note>, Error>
     where
         D: DatabaseAccess,
     {
@@ -108,7 +108,7 @@ impl Note {
 
         DatabaseRecord::link(publisher, &note, db, Publish::default()).await?;
 
-        Ok(note)
+        Ok(note.wrap())
     }
 
     fn before_create(&mut self) -> Result<(), aragog::Error> {
@@ -135,7 +135,7 @@ impl Validate for Note {
 }
 
 #[async_trait(?Send)]
-impl ToObject for DatabaseRecord<Note> {
+impl ToObject for Document<Note> {
     type Output = object::Note;
     type Error = crate::activitystreams::Error;
 

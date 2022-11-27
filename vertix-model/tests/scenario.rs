@@ -8,10 +8,10 @@ use test_log::test;
 async fn follow_publish_and_view_timeline() -> Result<()> {
     let conn = create_connection().await?;
 
-    let account1 = Account::create(Account::new("account1".into()), &conn).await?;
-    let account2 = Account::create(Account::new("account2".into()), &conn).await?;
+    let account1 = Account::create(Account::new("account1".into()), &conn).await?.wrap();
+    let account2 = Account::create(Account::new("account2".into()), &conn).await?.wrap();
 
-    let mut follow = Follow::link(&account1, &account2, &conn).await?;
+    let mut follow = Follow::link(&account1, &account2, None, &conn).await?;
 
     follow.accepted = Some(true);
     follow.save(&conn).await?;

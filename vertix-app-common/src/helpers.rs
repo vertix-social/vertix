@@ -1,12 +1,12 @@
 use actix_webfinger::Webfinger;
-use aragog::{DatabaseAccess, DatabaseRecord};
+use aragog::DatabaseAccess;
 use lapin::Channel;
 use reqwest::header;
 use url::Url;
 use regex::Regex;
 use lazy_static::lazy_static;
 use urlencoding::encode;
-use vertix_model::Account;
+use vertix_model::{Account, Document};
 use vertix_comm::{
     messages::{Action, ActionResponse},
     expect_reply_of
@@ -19,7 +19,7 @@ pub async fn find_or_fetch_account_by_uri<D>(
     config: &Config,
     db: &D,
     ch: &Channel,
-) -> Result<DatabaseRecord<Account>>
+) -> Result<Document<Account>>
 where
     D: DatabaseAccess,
 {

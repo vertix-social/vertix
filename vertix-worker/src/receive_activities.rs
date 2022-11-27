@@ -3,8 +3,7 @@ use std::sync::Arc;
 use aragog::DatabaseConnection;
 use lapin::Channel;
 use vertix_app_common::{helpers, Config};
-use vertix_comm::SendMessage;
-use vertix_comm::messages::{ReceiveActivity, Transaction, Action};
+use vertix_comm::messages::{ReceiveActivity, Action};
 use vertix_model::AragogConnectionManager;
 use anyhow::{bail, anyhow, Result};
 use url::Url;
@@ -52,18 +51,19 @@ async fn process_follow(
         .ok_or_else(|| anyhow!("Follow object is not URI"))?
         .as_url().clone();
 
+    let follow_uri: Option<Url> = activity.object_props.get_id().map(|u| u.as_url()).cloned();
+
     let from = helpers::find_or_fetch_account_by_uri(
         &actor_uri, &config, db, ch).await?;
     let to = helpers::find_or_fetch_account_by_uri(
         &object_uri, &config, db, ch).await?;
 
     if !(from.is_remote() && to.is_remote()) {
-        Transaction { actions: vec![
-            Action::InitiateFollow {
-                from_account: from.key().to_owned(),
-                to_account: to.key().to_owned(),
-            }
-        ] }.send(ch).await?;
+        Action::InitiateFollow {
+            from_account: from.key().to_owned(),
+            to_account: to.key().to_owned(),
+            uri: follow_uri,
+        }.send(ch).await?;
     } else {
         log::warn!("Tried to process follow involving two remote parties")
     }
