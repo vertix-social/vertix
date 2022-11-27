@@ -1,14 +1,12 @@
 /// Initialize an exchange on ``$ch`, named `$name`, with the given kind and queue names
 ///
-/// ```no_run
-/// #async fn ctx(ch: &lapin::Channel) -> crate::error::Result<()> {
+/// ```ignore
 /// setup_exchange!(ch,
 ///     TestExchange {
 ///         kind Direct
 ///         queues ["TestExchange.process", "TestExchange.send"]
 ///     }
 /// );
-/// #}
 /// ```
 macro_rules! setup_exchange {
     ($ch:expr, $name:ident { kind $kind:ident queues [ $($queue_name:literal),* $(,)? ] }) => ({
@@ -45,9 +43,10 @@ pub(crate) use setup_exchange;
 /// [crate::Error::InvalidReply] on failure to match.
 ///
 /// ```
+/// # use vertix_comm::expect_reply_of;
 /// let reply = "foo";
-/// assert!(expect_reply_of!(reply, "foo" => ()).is_ok());
-/// assert!(expect_reply_of!(reply, "bar" => ()).is_err());
+/// assert!(expect_reply_of!(reply; "foo" => ()).is_ok());
+/// assert!(expect_reply_of!(reply; "bar" => ()).is_err());
 /// ```
 #[macro_export]
 macro_rules! expect_reply_of {
