@@ -6,6 +6,9 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+vertix-model = { path = "../vertix-model" }
+vertix-comm = { path = "../vertix-comm" }
+vertix-app-common = { path = "../vertix-app-common" }
 actix-web = "4.2.1"
 actix-web-lab = "0.18"
 actix-webfinger = "0.4.1"
@@ -22,11 +25,8 @@ lapin = "2.1.1"
 futures = "0.3"
 url = "2.3.1"
 urlencoding = "2.1.2"
-awc = "3.0.1"
 chrono = { version = "0.4.23", features = ["serde"] }
-vertix-model = { path = "../vertix-model" }
-vertix-comm = { path = "../vertix-comm" }
-vertix-app-common = { path = "../vertix-app-common" }
+reqwest = "0.11.13"
 
 [dependencies.aragog]
 #version = "0.17"

@@ -1,6 +1,6 @@
 use actix_web::{web, get, Responder};
-use actix_webfinger::Webfinger;
 use serde::Deserialize;
+use vertix_app_common::helpers::webfinger;
 use vertix_comm::{expect_reply_of, messages::{Action, ActionResponse}};
 use vertix_model::Account;
 
@@ -34,10 +34,8 @@ async fn lookup_account(
         Ok(account) => Ok(web::Json(account)),
         Err(e) if e.is_not_found() && domain.is_some() => {
             // Fetch remote account
-            let awc = crate::make_awc_client();
-
-            let wf = Webfinger::fetch(&awc,
-                Some("acct:"),
+            let wf = webfinger(&state.reqwest,
+                "acct",
                 &username,
                 domain.as_deref().unwrap(),
                 true).await?;

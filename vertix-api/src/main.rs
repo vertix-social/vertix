@@ -20,6 +20,7 @@ pub struct ApiState {
     config: Config,
     pool: bb8::Pool<AragogConnectionManager>,
     broker: lapin::Connection,
+    reqwest: reqwest::Client,
 }
 
 impl ApiState {
@@ -97,16 +98,13 @@ async fn main() -> Result<()> {
 
     let broker = vertix_comm::create_connection().await?;
 
-    let state = web::Data::new(ApiState { config, pool, broker });
+    let reqwest = reqwest::Client::builder()
+        .user_agent(concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION")))
+        .build()?;
+
+    let state = web::Data::new(ApiState { config, pool, broker, reqwest });
 
     serve(state).await?;
 
     Ok(())
-}
-
-pub(crate) fn make_awc_client() -> awc::Client {
-    awc::Client::builder()
-        .add_default_header(("User-Agent",
-            concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"))))
-        .finish()
 }

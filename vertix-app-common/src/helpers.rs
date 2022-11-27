@@ -1,8 +1,11 @@
+use actix_webfinger::Webfinger;
 use aragog::{DatabaseAccess, DatabaseRecord};
 use lapin::Channel;
+use reqwest::header;
 use url::Url;
 use regex::Regex;
 use lazy_static::lazy_static;
+use urlencoding::encode;
 use vertix_model::Account;
 use vertix_comm::{
     messages::{Action, ActionResponse},
@@ -51,4 +54,29 @@ where
         },
         Err(e) => Err(e.into())
     }
+}
+
+pub async fn webfinger(
+    client: &reqwest::Client,
+    scheme: &str,
+    username: &str,
+    domain: &str,
+    https: bool
+) -> Result<Webfinger> {
+    let mut url = Url::parse("http://example.com/.well-known/webfinger")?;
+
+    url.set_scheme(if https { "https" } else { "http" }).unwrap();
+    url.set_host(Some(domain))?;
+    url.set_query(Some(&format!("resource={}:{}@{}",
+        encode(scheme), encode(username), encode(domain))));
+
+    let result = async {
+        client.get(url)
+            .header(header::ACCEPT, "application/json")
+            .send().await?
+            .error_for_status()?
+            .json().await
+    }.await;
+
+    result.map_err(Error::WebfingerFetch)
 }

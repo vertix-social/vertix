@@ -3,6 +3,7 @@ use std::sync::Arc;
 use activitystreams::{ext::Ext, actor::{Person, properties::ApActorProperties}};
 use anyhow::{Result, anyhow, bail};
 use aragog::Record;
+use chrono::Utc;
 use lapin::Channel;
 
 use log::{warn, debug};
@@ -71,7 +72,7 @@ async fn execute(
 
 static CONTENT_TYPES: &[&str] = &[
     "application/activity+json",
-    "application/ld+json; profile = \"https://www.w3.org/ns/activitystreams\"",
+    "application/ld+json",
 ];
 
 async fn execute_action(
@@ -86,11 +87,15 @@ async fn execute_action(
             let res = client.get(url.clone())
                 .header(reqwest::header::ACCEPT, CONTENT_TYPES.join(", "))
                 .send()
-                .await?;
+                .await?
+                .error_for_status()?;
 
             let person: Ext<Person, ApActorProperties> = res.json().await?;
-            let account_body: Account = person.try_into()?;
+            let mut account_body: Account = person.try_into()?;
             let mut account;
+
+            // We just fetched it, so set the right fetch time
+            account_body.remote.as_mut().unwrap().last_fetched_at = Some(Utc::now());
 
             // Ensure the person's url matches the one we requested
             if account_body.remote.as_ref().unwrap().uri != *url {

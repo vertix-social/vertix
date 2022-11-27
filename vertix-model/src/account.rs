@@ -43,7 +43,7 @@ pub struct RemoteAccountInfo {
 
     /// The last time the remote user was fetched.
     #[serde(default)]
-    pub last_remote_fetched_at: Option<String>,
+    pub last_fetched_at: Option<DateTime<Utc>>,
 
     /// Inbox url for remote user.
     #[serde(default)]
@@ -351,7 +351,7 @@ impl TryFrom<Ext<Person, ApActorProperties>> for Account {
             remote: Some(RemoteAccountInfo {
                 uri: id.as_url().clone(),
                 // we don't know, whoever is consuming this should set it.
-                last_remote_fetched_at: None,
+                last_fetched_at: None,
                 inbox: Some(person.extension.get_inbox().as_url().clone()),
                 outbox: Some(person.extension.get_outbox().as_url().clone()),
                 followers: person.extension.get_followers().map(|u| u.as_url().clone()),
@@ -369,7 +369,7 @@ impl RemoteAccountInfo {
     pub fn new(uri: Url) -> RemoteAccountInfo {
         RemoteAccountInfo {
             uri,
-            last_remote_fetched_at: None,
+            last_fetched_at: None,
             inbox: None,
             outbox: None,
             followers: None,

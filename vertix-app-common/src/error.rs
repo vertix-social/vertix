@@ -13,6 +13,9 @@ pub enum Error {
     #[error("url parse error: {0}")]
     UrlParse(#[from] url::ParseError),
 
+    #[error("webfinger fetch error: {0}")]
+    WebfingerFetch(reqwest::Error),
+
     #[error("{0}")]
     InternalError(Cow<'static, str>),
 }

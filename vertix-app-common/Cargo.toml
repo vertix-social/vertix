@@ -16,6 +16,8 @@ log = "0.4"
 lapin = "2.1.1"
 regex = "1.7"
 lazy_static = "1.4.0"
+reqwest = "0.11.13"
+actix-webfinger = "0.4.1"
 
 [dependencies.aragog]
 #version = "0.17"

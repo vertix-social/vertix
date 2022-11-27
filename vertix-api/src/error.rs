@@ -37,8 +37,8 @@ pub enum Error {
     #[error("url parse error: {0}")]
     UrlParse(#[from] url::ParseError),
 
-    #[error("webfinger error: {0}")]
-    Webfinger(#[from] actix_webfinger::FetchError),
+    #[error("webfinger fetch error: {0}")]
+    WebfingerFetch(reqwest::Error),
 
     #[error("internal error: {0}")]
     InternalError(Cow<'static, str>),
@@ -54,7 +54,7 @@ impl ResponseError for Error {
                 .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR),
 
             // Assumption. Not sure if correct
-            Error::Webfinger(_) => StatusCode::NOT_FOUND,
+            Error::WebfingerFetch(_) => StatusCode::NOT_FOUND,
 
             Error::NotFound => StatusCode::NOT_FOUND,
 
@@ -108,6 +108,7 @@ impl From<vertix_app_common::Error> for Error {
             Model(m) => m.into(),
             Comm(c) => c.into(),
             UrlParse(u) => u.into(),
+            WebfingerFetch(r) => Error::WebfingerFetch(r),
             InternalError(e) => Error::InternalError(e),
         }
     }
